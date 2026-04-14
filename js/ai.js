@@ -60,13 +60,11 @@ Be concise, friendly, and practical. Give specific actionable advice based on th
   }
 
   function callClaude(apiKey, payload) {
-    return fetch('https://api.anthropic.com/v1/messages', {
+    return fetch('/api/claude', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-calls': 'true',
+        'X-Api-Key': apiKey,
       },
       body: JSON.stringify(payload),
     });
