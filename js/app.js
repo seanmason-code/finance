@@ -528,6 +528,7 @@ const App = (() => {
   async function saveTransaction(e) {
     e.preventDefault();
     const id = document.getElementById('txn-id').value || crypto.randomUUID();
+    const isEdit = !!document.getElementById('txn-id').value;
     const t = {
       id,
       type: document.getElementById('txn-type').value,
@@ -543,6 +544,29 @@ const App = (() => {
       const idx = transactions.findIndex(x => x.id === id);
       if (idx >= 0) transactions[idx] = t;
       else transactions.push(t);
+
+      // If editing category, offer to apply to all matching descriptions
+      if (isEdit) {
+        const original = transactions.find(x => x.id === id);
+        const matches = transactions.filter(x =>
+          x.id !== id &&
+          x.description.trim().toLowerCase() === t.description.toLowerCase() &&
+          x.category !== t.category
+        );
+        if (matches.length > 0) {
+          const apply = confirm(`Apply "${t.category}" to all ${matches.length} other transaction${matches.length !== 1 ? 's' : ''} named "${t.description}"?`);
+          if (apply) {
+            for (const m of matches) {
+              const updated = { ...m, category: t.category };
+              await SB.upsertTransaction(updated);
+              const i = transactions.findIndex(x => x.id === m.id);
+              if (i >= 0) transactions[i] = updated;
+            }
+            showToast(`Updated ${matches.length} transaction${matches.length !== 1 ? 's' : ''} to "${t.category}"`);
+          }
+        }
+      }
+
       closeModals();
       refreshCurrentPage();
       clearAISnapshot();
