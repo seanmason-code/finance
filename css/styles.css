@@ -1023,6 +1023,16 @@ body {
   min-height: 18px;
 }
 
+.import-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 10px 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
 .import-table-wrap {
   max-height: 420px;
   overflow-y: auto;

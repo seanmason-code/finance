@@ -8,6 +8,8 @@ const App = (() => {
   let editingTxnId = null;
   let _importRows = [];
   let _csvFiles = []; // [{text, filename}]
+  let _importPage = 0;
+  const IMPORT_PAGE_SIZE = 100;
 
   // ===== Boot: setup → login → app =====
   async function boot() {
@@ -915,12 +917,18 @@ const App = (() => {
       if (!_csvFiles.length) return;
       const skip = document.getElementById('import-skip-internal').checked;
       _importRows = _csvFiles.flatMap(f => CSVImport.processRows(CSVImport.parseCSV(f.text), skip, f.filename));
+      const dupKeys = new Set(transactions.map(t => `${t.date}|${t.description}|${Math.round(t.amount * 100)}`));
+      _importRows.forEach(row => {
+        row._isDuplicate = dupKeys.has(`${row.date}|${row.description}|${Math.round(row.amount * 100)}`);
+        row._checked = !row._isDuplicate;
+      });
+      _importPage = 0;
       renderImportTable();
     });
 
     document.getElementById('import-select-all')?.addEventListener('change', (e) => {
-      document.querySelectorAll('.import-row-check').forEach(cb => { cb.checked = e.target.checked; });
-      updateImportSummary();
+      _importRows.forEach(row => { row._checked = e.target.checked; });
+      renderImportTable();
     });
 
     document.getElementById('import-confirm-btn')?.addEventListener('click', doImport);
@@ -929,21 +937,27 @@ const App = (() => {
   function openImportModal() {
     const skipInternal = document.getElementById('import-skip-internal').checked;
     _importRows = _csvFiles.flatMap(f => CSVImport.processRows(CSVImport.parseCSV(f.text), skipInternal, f.filename));
+    const dupKeys = new Set(transactions.map(t => `${t.date}|${t.description}|${Math.round(t.amount * 100)}`));
+    _importRows.forEach(row => {
+      row._isDuplicate = dupKeys.has(`${row.date}|${row.description}|${Math.round(row.amount * 100)}`);
+      row._checked = !row._isDuplicate;
+    });
+    _importPage = 0;
     renderImportTable();
     document.getElementById('modal-import').classList.remove('hidden');
   }
 
   function renderImportTable() {
     const tbody = document.getElementById('import-tbody');
-    tbody.innerHTML = _importRows.map((row, i) => {
-      const isDuplicate = transactions.some(t =>
-        t.date === row.date &&
-        Math.abs(t.amount - row.amount) < 0.01 &&
-        t.description === row.description
-      );
-      const rowClass = isDuplicate ? 'duplicate' : '';
-      const checked = isDuplicate ? '' : ' checked';
-      const dupBadge = isDuplicate ? '<span class="dup-badge">exists</span>' : '';
+    const totalPages = Math.ceil(_importRows.length / IMPORT_PAGE_SIZE);
+    const start = _importPage * IMPORT_PAGE_SIZE;
+    const pageRows = _importRows.slice(start, start + IMPORT_PAGE_SIZE);
+
+    tbody.innerHTML = pageRows.map((row, pi) => {
+      const i = start + pi;
+      const rowClass = row._isDuplicate ? 'duplicate' : '';
+      const checked = row._checked ? ' checked' : '';
+      const dupBadge = row._isDuplicate ? '<span class="dup-badge">exists</span>' : '';
       return `<tr class="${rowClass}" data-idx="${i}">
         <td><input type="checkbox" class="import-row-check" data-idx="${i}"${checked} /></td>
         <td class="import-date">${row.date}</td>
@@ -958,7 +972,6 @@ const App = (() => {
         const idx = parseInt(e.target.dataset.idx);
         const desc = _importRows[idx].description;
         const cat = e.target.value;
-        // Update all rows with the same description
         _importRows.forEach((row, i) => {
           if (row.description === desc) {
             row.category = cat;
@@ -968,16 +981,39 @@ const App = (() => {
         });
       });
     });
+
     tbody.querySelectorAll('.import-row-check').forEach(cb => {
-      cb.addEventListener('change', updateImportSummary);
+      cb.addEventListener('change', (e) => {
+        _importRows[parseInt(e.target.dataset.idx)]._checked = e.target.checked;
+        updateImportSummary();
+      });
     });
+
+    // Pagination controls
+    let pager = document.getElementById('import-pager');
+    if (!pager) {
+      pager = document.createElement('div');
+      pager.id = 'import-pager';
+      pager.className = 'import-pager';
+      document.querySelector('.import-table-wrap').after(pager);
+    }
+    if (totalPages > 1) {
+      pager.innerHTML = `
+        <button class="btn-ghost" id="import-prev" ${_importPage === 0 ? 'disabled' : ''}>&#8592; Prev</button>
+        <span>Page ${_importPage + 1} of ${totalPages}</span>
+        <button class="btn-ghost" id="import-next" ${_importPage >= totalPages - 1 ? 'disabled' : ''}>Next &#8594;</button>`;
+      document.getElementById('import-prev').addEventListener('click', () => { _importPage--; renderImportTable(); });
+      document.getElementById('import-next').addEventListener('click', () => { _importPage++; renderImportTable(); });
+    } else {
+      pager.innerHTML = '';
+    }
 
     updateImportSummary();
   }
 
   function updateImportSummary() {
     const total = _importRows.length;
-    const selected = document.querySelectorAll('.import-row-check:checked').length;
+    const selected = _importRows.filter(r => r._checked).length;
     document.getElementById('import-summary').textContent =
       `${total} transactions found · ${selected} selected`;
     document.getElementById('import-confirm-btn').textContent =
@@ -985,10 +1021,9 @@ const App = (() => {
   }
 
   async function doImport() {
-    const checked = [...document.querySelectorAll('.import-row-check:checked')]
-      .map(cb => parseInt(cb.dataset.idx));
+    const toImport = _importRows.filter(r => r._checked);
 
-    if (checked.length === 0) {
+    if (toImport.length === 0) {
       alert('No transactions selected.');
       return;
     }
@@ -998,8 +1033,7 @@ const App = (() => {
     btn.disabled = true;
 
     let count = 0;
-    for (const idx of checked) {
-      const row = _importRows[idx];
+    for (const row of toImport) {
       const t = {
         id: crypto.randomUUID(),
         date: row.date,
