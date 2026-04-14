@@ -131,6 +131,20 @@ const App = (() => {
       recurring = [];
     }
 
+    // Auto-seed budgets on first use if none exist
+    if (budgets.length === 0) {
+      for (const preset of PRESET_BUDGETS) {
+        const b = {
+          id: crypto.randomUUID(),
+          category: preset.category,
+          amount: preset.amount,
+          items: (preset.items || []).map(item => ({ id: crypto.randomUUID(), name: item.name, amount: item.amount })),
+        };
+        try { await SB.upsertBudget(b); } catch { await SB.upsertBudget({ id: b.id, category: b.category, amount: b.amount }); }
+        budgets.push(b);
+      }
+    }
+
     setTodayDate();
     bindNav();
     bindTransactionModal();
