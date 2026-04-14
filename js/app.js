@@ -133,8 +133,28 @@ const App = (() => {
     bindFilters();
     bindExportImport();
     bindSignOut();
+    bindMobileMenu();
 
     renderDashboard();
+  }
+
+  function bindMobileMenu() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    document.getElementById('btn-menu')?.addEventListener('click', () => {
+      sidebar.classList.add('open');
+      overlay.classList.add('active');
+    });
+    overlay.addEventListener('click', () => {
+      sidebar.classList.remove('open');
+      overlay.classList.remove('active');
+    });
+    document.querySelectorAll('[data-page]').forEach(link => {
+      link.addEventListener('click', () => {
+        sidebar.classList.remove('open');
+        overlay.classList.remove('active');
+      });
+    });
   }
 
   function bindSignOut() {
