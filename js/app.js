@@ -955,7 +955,17 @@ const App = (() => {
 
     tbody.querySelectorAll('.import-cat-select').forEach(sel => {
       sel.addEventListener('change', (e) => {
-        _importRows[parseInt(e.target.dataset.idx)].category = e.target.value;
+        const idx = parseInt(e.target.dataset.idx);
+        const desc = _importRows[idx].description;
+        const cat = e.target.value;
+        // Update all rows with the same description
+        _importRows.forEach((row, i) => {
+          if (row.description === desc) {
+            row.category = cat;
+            const otherSel = tbody.querySelector(`.import-cat-select[data-idx="${i}"]`);
+            if (otherSel) otherSel.value = cat;
+          }
+        });
       });
     });
     tbody.querySelectorAll('.import-row-check').forEach(cb => {
