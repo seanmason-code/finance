@@ -70,10 +70,28 @@ const SB = (() => {
     if (error) throw error;
   }
 
+  // ===== Recurring =====
+  async function getRecurring() {
+    const { data, error } = await client.from('recurring').select('*').order('description');
+    if (error) throw error;
+    return data;
+  }
+
+  async function upsertRecurring(r) {
+    const { error } = await client.from('recurring').upsert(r);
+    if (error) throw error;
+  }
+
+  async function deleteRecurring(id) {
+    const { error } = await client.from('recurring').delete().eq('id', id);
+    if (error) throw error;
+  }
+
   return {
     init, get,
     signIn, signUp, signOut, getSession,
     getTransactions, upsertTransaction, deleteTransaction,
     getBudgets, upsertBudget, deleteBudget,
+    getRecurring, upsertRecurring, deleteRecurring,
   };
 })();

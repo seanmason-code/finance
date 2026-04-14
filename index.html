@@ -86,6 +86,10 @@
           <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
           Budgets
         </a></li>
+        <li><a href="#" data-page="recurring">
+          <svg viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+          Recurring
+        </a></li>
         <li><a href="#" data-page="ai">
           <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
           AI Advisor
@@ -122,16 +126,19 @@
 
         <div class="stats-grid">
           <div class="stat-card income">
-            <span class="stat-label">This Month Income</span>
+            <span class="stat-label">Monthly Income</span>
             <span class="stat-value" id="stat-income">$0.00</span>
+            <span class="stat-sub" id="stat-income-weekly"></span>
           </div>
           <div class="stat-card expenses">
-            <span class="stat-label">This Month Expenses</span>
+            <span class="stat-label">Monthly Expenses</span>
             <span class="stat-value" id="stat-expenses">$0.00</span>
+            <span class="stat-sub" id="stat-expenses-weekly"></span>
           </div>
           <div class="stat-card balance">
             <span class="stat-label">Net This Month</span>
             <span class="stat-value" id="stat-net">$0.00</span>
+            <span class="stat-sub" id="stat-net-weekly"></span>
           </div>
           <div class="stat-card budget">
             <span class="stat-label">Budget Remaining</span>
@@ -197,6 +204,16 @@
           <button id="btn-add-budget" class="btn-primary">+ Add Budget</button>
         </header>
         <div id="budgets-list"></div>
+      </div>
+
+      <!-- Recurring Page -->
+      <div id="page-recurring" class="page">
+        <header class="page-header">
+          <h1>Recurring</h1>
+          <button id="btn-add-recurring" class="btn-primary">+ Add Recurring</button>
+        </header>
+        <div class="recurring-summary" id="recurring-summary"></div>
+        <div id="recurring-list"></div>
       </div>
 
       <!-- AI Advisor Page -->
@@ -354,6 +371,77 @@
         <div class="modal-actions">
           <button type="button" class="btn-ghost modal-close-btn">Cancel</button>
           <button type="submit" class="btn-primary">Save Budget</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Recurring Modal -->
+  <div id="modal-recurring" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2 id="modal-recurring-title">Add Recurring</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <form id="form-recurring">
+        <div class="form-tabs">
+          <button type="button" class="tab-btn-r active" data-type="expense">Expense</button>
+          <button type="button" class="tab-btn-r" data-type="income">Income</button>
+        </div>
+        <input type="hidden" id="recurring-id" value="" />
+        <input type="hidden" id="recurring-type" value="expense" />
+
+        <label>Description</label>
+        <input type="text" id="recurring-description" placeholder="e.g. Rent, Salary, Netflix" required />
+
+        <label>Amount</label>
+        <div class="amount-input">
+          <span class="currency-symbol">$</span>
+          <input type="number" id="recurring-amount" placeholder="0.00" step="0.01" min="0" required />
+        </div>
+
+        <label>Category</label>
+        <select id="recurring-category" required>
+          <option value="">Select category...</option>
+          <optgroup label="Expenses">
+            <option value="Housing">Housing</option>
+            <option value="Mortgage">Mortgage</option>
+            <option value="Rates">Rates</option>
+            <option value="Food & Dining">Food & Dining</option>
+            <option value="Transport">Transport</option>
+            <option value="Health">Health</option>
+            <option value="Entertainment">Entertainment</option>
+            <option value="Shopping">Shopping</option>
+            <option value="Utilities">Utilities</option>
+            <option value="Education">Education</option>
+            <option value="Kids">Kids</option>
+            <option value="Savings">Savings</option>
+            <option value="Personal Care">Personal Care</option>
+            <option value="Other">Other</option>
+          </optgroup>
+          <optgroup label="Income">
+            <option value="Salary">Salary</option>
+            <option value="Rental Income">Rental Income</option>
+            <option value="Freelance">Freelance</option>
+            <option value="Investment">Investment</option>
+            <option value="Other Income">Other Income</option>
+          </optgroup>
+        </select>
+
+        <label>Frequency</label>
+        <select id="recurring-frequency">
+          <option value="weekly">Weekly</option>
+          <option value="fortnightly">Fortnightly</option>
+          <option value="monthly" selected>Monthly</option>
+        </select>
+
+        <label>Day of month (for monthly/fortnightly)</label>
+        <input type="number" id="recurring-day" placeholder="e.g. 1, 14, 15" min="1" max="31" value="1" />
+
+        <div class="modal-actions">
+          <button type="button" class="btn-ghost modal-close-btn">Cancel</button>
+          <button type="submit" class="btn-primary">Save</button>
         </div>
       </form>
     </div>

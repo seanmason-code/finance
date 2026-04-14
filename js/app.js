@@ -2,6 +2,7 @@
 const App = (() => {
   let transactions = [];
   let budgets = [];
+  let recurring = [];
   let currency = 'NZD';
   let chatHistory = [];
   let editingTxnId = null;
@@ -118,16 +119,19 @@ const App = (() => {
     try {
       transactions = await SB.getTransactions();
       budgets = await SB.getBudgets();
+      recurring = await SB.getRecurring();
     } catch (err) {
       console.error('Failed to load data:', err);
       transactions = [];
       budgets = [];
+      recurring = [];
     }
 
     setTodayDate();
     bindNav();
     bindTransactionModal();
     bindBudgetModal();
+    bindRecurringModal();
     bindAI();
     bindSettings();
     bindFilters();
@@ -187,6 +191,7 @@ const App = (() => {
     if (page === 'dashboard') renderDashboard();
     if (page === 'transactions') renderTransactionsList();
     if (page === 'budgets') renderBudgets();
+    if (page === 'recurring') renderRecurring();
   }
 
   // ===== Dashboard =====
@@ -202,9 +207,18 @@ const App = (() => {
     const totalBudget = budgets.reduce((s, b) => s + b.amount, 0);
     const budgetRemaining = totalBudget - expenses;
 
+    const weeklyIncome = income * 12 / 52;
+    const weeklyExpenses = expenses * 12 / 52;
+
     document.getElementById('stat-income').textContent = formatCurrency(income);
     document.getElementById('stat-expenses').textContent = formatCurrency(expenses);
     document.getElementById('stat-net').textContent = formatCurrency(net);
+    const incWk = document.getElementById('stat-income-weekly');
+    const expWk = document.getElementById('stat-expenses-weekly');
+    const netWk = document.getElementById('stat-net-weekly');
+    if (incWk) incWk.textContent = `${formatCurrency(weeklyIncome)}/wk`;
+    if (expWk) expWk.textContent = `${formatCurrency(weeklyExpenses)}/wk`;
+    if (netWk) netWk.textContent = `${formatCurrency((net) * 12 / 52)}/wk`;
     document.getElementById('stat-budget-remaining').textContent =
       totalBudget > 0 ? formatCurrency(budgetRemaining) : '—';
 
@@ -531,6 +545,174 @@ const App = (() => {
     } catch (err) {
       alert('Failed to delete: ' + err.message);
     }
+  }
+
+  // ===== Recurring =====
+  function renderRecurring() {
+    const container = document.getElementById('recurring-list');
+    const summary = document.getElementById('recurring-summary');
+
+    // Weekly/monthly summary
+    let totalWeeklyIn = 0, totalWeeklyOut = 0;
+    recurring.filter(r => r.active).forEach(r => {
+      const weekly = r.frequency === 'weekly' ? r.amount
+        : r.frequency === 'fortnightly' ? r.amount / 2
+        : r.amount * 12 / 52;
+      if (r.type === 'income') totalWeeklyIn += weekly;
+      else totalWeeklyOut += weekly;
+    });
+
+    summary.innerHTML = `
+      <div class="stats-grid" style="margin-bottom:16px">
+        <div class="stat-card income">
+          <span class="stat-label">Weekly Income</span>
+          <span class="stat-value">${formatCurrency(totalWeeklyIn)}</span>
+        </div>
+        <div class="stat-card expenses">
+          <span class="stat-label">Weekly Expenses</span>
+          <span class="stat-value">${formatCurrency(totalWeeklyOut)}</span>
+        </div>
+        <div class="stat-card income">
+          <span class="stat-label">Monthly Income</span>
+          <span class="stat-value">${formatCurrency(totalWeeklyIn * 52 / 12)}</span>
+        </div>
+        <div class="stat-card expenses">
+          <span class="stat-label">Monthly Expenses</span>
+          <span class="stat-value">${formatCurrency(totalWeeklyOut * 52 / 12)}</span>
+        </div>
+      </div>`;
+
+    if (recurring.length === 0) {
+      container.innerHTML = '<div class="empty-state"><p>No recurring transactions yet. Add your salary, rent, subscriptions etc.</p></div>';
+      return;
+    }
+
+    const income = recurring.filter(r => r.type === 'income');
+    const expenses = recurring.filter(r => r.type === 'expense');
+
+    container.innerHTML = [
+      income.length ? `<div class="recurring-group-label">Income</div>` + income.map(r => recurringHTML(r)).join('') : '',
+      expenses.length ? `<div class="recurring-group-label">Expenses</div>` + expenses.map(r => recurringHTML(r)).join('') : '',
+    ].join('');
+
+    container.querySelectorAll('.recurring-edit').forEach(btn => {
+      btn.addEventListener('click', () => openEditRecurring(btn.dataset.id));
+    });
+    container.querySelectorAll('.recurring-delete').forEach(btn => {
+      btn.addEventListener('click', () => deleteRecurring(btn.dataset.id));
+    });
+    container.querySelectorAll('.recurring-toggle').forEach(btn => {
+      btn.addEventListener('click', () => toggleRecurring(btn.dataset.id));
+    });
+  }
+
+  function recurringHTML(r) {
+    const weekly = r.frequency === 'weekly' ? r.amount
+      : r.frequency === 'fortnightly' ? r.amount / 2
+      : r.amount * 12 / 52;
+    const monthly = weekly * 52 / 12;
+    const freqLabel = { weekly: 'Weekly', fortnightly: 'Fortnightly', monthly: `Monthly (${r.day_of_month}${daySuffix(r.day_of_month)})` }[r.frequency] || r.frequency;
+
+    return `<div class="recurring-item ${r.active ? '' : 'inactive'}">
+      <div class="txn-icon ${r.type}">${categoryIcon(r.category)}</div>
+      <div class="txn-details">
+        <div class="txn-description">${escHtml(r.description)}</div>
+        <div class="txn-meta">${escHtml(r.category)} · ${freqLabel}</div>
+      </div>
+      <div class="recurring-amounts">
+        <div class="recurring-weekly">${formatCurrency(weekly)}/wk</div>
+        <div class="recurring-monthly">${formatCurrency(monthly)}/mo</div>
+      </div>
+      <div class="txn-actions" style="opacity:1">
+        <button class="txn-btn recurring-toggle" data-id="${r.id}" title="${r.active ? 'Pause' : 'Activate'}">${r.active ? '⏸' : '▶'}</button>
+        <button class="txn-btn recurring-edit" data-id="${r.id}" title="Edit">✏️</button>
+        <button class="txn-btn delete recurring-delete" data-id="${r.id}" title="Delete">🗑</button>
+      </div>
+    </div>`;
+  }
+
+  function daySuffix(d) {
+    if (d >= 11 && d <= 13) return 'th';
+    return ['th','st','nd','rd','th','th','th','th','th','th'][d % 10];
+  }
+
+  function bindRecurringModal() {
+    document.getElementById('btn-add-recurring')?.addEventListener('click', openAddRecurring);
+    document.getElementById('form-recurring')?.addEventListener('submit', saveRecurring);
+    document.querySelectorAll('.tab-btn-r').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn-r').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('recurring-type').value = btn.dataset.type;
+      });
+    });
+  }
+
+  function openAddRecurring() {
+    document.getElementById('recurring-id').value = '';
+    document.getElementById('form-recurring').reset();
+    document.getElementById('recurring-type').value = 'expense';
+    document.querySelectorAll('.tab-btn-r').forEach(b => b.classList.toggle('active', b.dataset.type === 'expense'));
+    document.getElementById('modal-recurring-title').textContent = 'Add Recurring';
+    document.getElementById('modal-recurring').classList.remove('hidden');
+  }
+
+  function openEditRecurring(id) {
+    const r = recurring.find(r => r.id === id);
+    if (!r) return;
+    document.getElementById('recurring-id').value = r.id;
+    document.getElementById('recurring-type').value = r.type;
+    document.getElementById('recurring-description').value = r.description;
+    document.getElementById('recurring-amount').value = r.amount;
+    document.getElementById('recurring-category').value = r.category;
+    document.getElementById('recurring-frequency').value = r.frequency;
+    document.getElementById('recurring-day').value = r.day_of_month;
+    document.querySelectorAll('.tab-btn-r').forEach(b => b.classList.toggle('active', b.dataset.type === r.type));
+    document.getElementById('modal-recurring-title').textContent = 'Edit Recurring';
+    document.getElementById('modal-recurring').classList.remove('hidden');
+  }
+
+  async function saveRecurring(e) {
+    e.preventDefault();
+    const id = document.getElementById('recurring-id').value || crypto.randomUUID();
+    const r = {
+      id,
+      type: document.getElementById('recurring-type').value,
+      description: document.getElementById('recurring-description').value.trim(),
+      amount: parseFloat(document.getElementById('recurring-amount').value),
+      category: document.getElementById('recurring-category').value,
+      frequency: document.getElementById('recurring-frequency').value,
+      day_of_month: parseInt(document.getElementById('recurring-day').value) || 1,
+      active: true,
+    };
+    try {
+      await SB.upsertRecurring(r);
+      const idx = recurring.findIndex(x => x.id === id);
+      if (idx >= 0) recurring[idx] = r; else recurring.push(r);
+      closeModals();
+      renderRecurring();
+    } catch (err) {
+      alert('Failed to save: ' + err.message);
+    }
+  }
+
+  async function deleteRecurring(id) {
+    if (!confirm('Delete this recurring transaction?')) return;
+    try {
+      await SB.deleteRecurring(id);
+      recurring = recurring.filter(r => r.id !== id);
+      renderRecurring();
+    } catch (err) {
+      alert('Failed to delete: ' + err.message);
+    }
+  }
+
+  async function toggleRecurring(id) {
+    const r = recurring.find(r => r.id === id);
+    if (!r) return;
+    r.active = !r.active;
+    await SB.upsertRecurring(r);
+    renderRecurring();
   }
 
   // ===== AI Chat =====

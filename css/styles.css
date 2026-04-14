@@ -240,6 +240,12 @@ body {
   letter-spacing: -0.5px;
 }
 
+.stat-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
 .stat-card.income .stat-value { color: var(--green); }
 .stat-card.expenses .stat-value { color: var(--red); }
 .stat-card.balance .stat-value { color: var(--accent-light); }
@@ -730,6 +736,47 @@ body {
   gap: 10px;
   justify-content: flex-end;
   margin-top: 4px;
+}
+
+/* ===== Recurring ===== */
+.recurring-group-label {
+  font-size: 12px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+  padding: 12px 0 6px;
+}
+
+.recurring-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 8px;
+  transition: var(--transition);
+}
+
+.recurring-item.inactive { opacity: 0.45; }
+
+.recurring-amounts {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.recurring-weekly {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.recurring-monthly {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
 }
 
 /* ===== Auth Screens ===== */
