@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#1a1a2e" />
+  <title>Finance</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="css/styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <!-- Setup Screen (first time only) -->
+  <div id="screen-setup" class="auth-screen hidden">
+    <div class="auth-box">
+      <div class="auth-logo">$</div>
+      <h1>Finance</h1>
+      <p class="auth-subtitle">Connect your Supabase project to get started</p>
+      <form id="form-setup">
+        <label>Supabase Project URL</label>
+        <input type="url" id="setup-url" placeholder="https://xxxx.supabase.co" required />
+        <label>Supabase Anon Key</label>
+        <input type="text" id="setup-anon-key" placeholder="eyJ..." required />
+        <button type="submit" class="btn-primary btn-full">Connect</button>
+      </form>
+      <p class="auth-hint">Find these in your Supabase project under Settings → API</p>
+    </div>
+  </div>
+
+  <!-- Login Screen -->
+  <div id="screen-login" class="auth-screen hidden">
+    <div class="auth-box">
+      <div class="auth-logo">$</div>
+      <h1>Finance</h1>
+      <p class="auth-subtitle">Sign in to your shared account</p>
+      <div id="login-error" class="auth-error hidden"></div>
+      <form id="form-login">
+        <label>Email</label>
+        <input type="email" id="login-email" placeholder="you@example.com" required autocomplete="email" />
+        <label>Password</label>
+        <input type="password" id="login-password" placeholder="••••••••" required autocomplete="current-password" />
+        <button type="submit" class="btn-primary btn-full">Sign In</button>
+      </form>
+      <button id="btn-show-signup" class="btn-link">Don't have an account? Sign up</button>
+      <button id="btn-reset-setup" class="btn-link" style="font-size:11px;margin-top:4px;color:var(--text-dim)">Change Supabase project</button>
+    </div>
+  </div>
+
+  <!-- Signup Screen -->
+  <div id="screen-signup" class="auth-screen hidden">
+    <div class="auth-box">
+      <div class="auth-logo">$</div>
+      <h1>Create Account</h1>
+      <p class="auth-subtitle">Set up your shared finance account</p>
+      <div id="signup-error" class="auth-error hidden"></div>
+      <form id="form-signup">
+        <label>Email</label>
+        <input type="email" id="signup-email" placeholder="you@example.com" required />
+        <label>Password</label>
+        <input type="password" id="signup-password" placeholder="Min 6 characters" required minlength="6" />
+        <button type="submit" class="btn-primary btn-full">Create Account</button>
+      </form>
+      <button id="btn-show-login" class="btn-link">Already have an account? Sign in</button>
+    </div>
+  </div>
+
+  <div id="app">
+
+    <!-- Sidebar Nav -->
+    <nav id="sidebar">
+      <div class="nav-logo">
+        <span class="logo-icon">$</span>
+        <span class="logo-text">Finance</span>
+      </div>
+      <ul class="nav-links">
+        <li><a href="#" data-page="dashboard" class="active">
+          <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          Dashboard
+        </a></li>
+        <li><a href="#" data-page="transactions">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          Transactions
+        </a></li>
+        <li><a href="#" data-page="budgets">
+          <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+          Budgets
+        </a></li>
+        <li><a href="#" data-page="ai">
+          <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          AI Advisor
+        </a></li>
+        <li><a href="#" data-page="settings">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          Settings
+        </a></li>
+      </ul>
+      <div class="nav-footer">
+        <span id="nav-user-email" class="nav-user-email"></span>
+        <button id="btn-signout" class="btn-signout">Sign out</button>
+      </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main id="content">
+
+      <!-- Dashboard Page -->
+      <div id="page-dashboard" class="page active">
+        <header class="page-header">
+          <h1>Dashboard</h1>
+          <button id="btn-add-transaction" class="btn-primary">+ Add Transaction</button>
+        </header>
+
+        <div class="stats-grid">
+          <div class="stat-card income">
+            <span class="stat-label">This Month Income</span>
+            <span class="stat-value" id="stat-income">$0.00</span>
+          </div>
+          <div class="stat-card expenses">
+            <span class="stat-label">This Month Expenses</span>
+            <span class="stat-value" id="stat-expenses">$0.00</span>
+          </div>
+          <div class="stat-card balance">
+            <span class="stat-label">Net This Month</span>
+            <span class="stat-value" id="stat-net">$0.00</span>
+          </div>
+          <div class="stat-card budget">
+            <span class="stat-label">Budget Remaining</span>
+            <span class="stat-value" id="stat-budget-remaining">$0.00</span>
+          </div>
+        </div>
+
+        <div class="charts-row">
+          <div class="chart-card">
+            <h3>Spending by Category</h3>
+            <canvas id="chart-categories"></canvas>
+          </div>
+          <div class="chart-card">
+            <h3>Spending Over Time</h3>
+            <canvas id="chart-timeline"></canvas>
+          </div>
+        </div>
+
+        <div class="section-card">
+          <h3>Recent Transactions</h3>
+          <div id="recent-transactions"></div>
+        </div>
+
+        <div class="section-card ai-snapshot">
+          <div class="ai-header">
+            <span class="ai-badge">AI</span>
+            <h3>Financial Snapshot</h3>
+            <button id="btn-refresh-snapshot" class="btn-ghost">Refresh</button>
+          </div>
+          <div id="ai-snapshot-content">
+            <p class="placeholder-text">Add some transactions to get your AI financial snapshot.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Transactions Page -->
+      <div id="page-transactions" class="page">
+        <header class="page-header">
+          <h1>Transactions</h1>
+          <button class="btn-primary open-add-transaction">+ Add Transaction</button>
+        </header>
+        <div class="filters-bar">
+          <select id="filter-month">
+            <option value="">All Time</option>
+          </select>
+          <select id="filter-category">
+            <option value="">All Categories</option>
+          </select>
+          <select id="filter-type">
+            <option value="">All Types</option>
+            <option value="expense">Expenses</option>
+            <option value="income">Income</option>
+          </select>
+          <input type="text" id="filter-search" placeholder="Search..." />
+        </div>
+        <div id="transactions-list"></div>
+      </div>
+
+      <!-- Budgets Page -->
+      <div id="page-budgets" class="page">
+        <header class="page-header">
+          <h1>Budgets</h1>
+          <button id="btn-add-budget" class="btn-primary">+ Add Budget</button>
+        </header>
+        <div id="budgets-list"></div>
+      </div>
+
+      <!-- AI Advisor Page -->
+      <div id="page-ai" class="page">
+        <header class="page-header">
+          <h1>AI Advisor</h1>
+        </header>
+        <div id="ai-chat">
+          <div id="ai-messages"></div>
+          <div id="ai-input-bar">
+            <textarea id="ai-input" placeholder="Ask about your finances..." rows="1"></textarea>
+            <button id="btn-ai-send" class="btn-primary">Send</button>
+          </div>
+        </div>
+        <div class="ai-suggestions">
+          <button class="suggestion-chip" data-msg="Give me a summary of my spending this month">Monthly summary</button>
+          <button class="suggestion-chip" data-msg="Where am I overspending?">Where am I overspending?</button>
+          <button class="suggestion-chip" data-msg="How can I improve my budget?">Improve my budget</button>
+          <button class="suggestion-chip" data-msg="What are my biggest expenses?">Biggest expenses</button>
+        </div>
+      </div>
+
+      <!-- Settings Page -->
+      <div id="page-settings" class="page">
+        <header class="page-header">
+          <h1>Settings</h1>
+        </header>
+        <div class="settings-section">
+          <h3>AI Configuration</h3>
+          <label>Claude API Key</label>
+          <div class="input-row">
+            <input type="password" id="setting-api-key" placeholder="sk-ant-..." />
+            <button id="btn-save-api-key" class="btn-primary">Save</button>
+          </div>
+          <p class="hint">Your key is stored locally only. Never leaves your device.</p>
+        </div>
+        <div class="settings-section">
+          <h3>Currency</h3>
+          <select id="setting-currency">
+            <option value="NZD">NZD — New Zealand Dollar</option>
+            <option value="USD">USD — US Dollar</option>
+            <option value="AUD">AUD — Australian Dollar</option>
+            <option value="GBP">GBP — British Pound</option>
+            <option value="EUR">EUR — Euro</option>
+          </select>
+        </div>
+        <div class="settings-section">
+          <h3>Data</h3>
+          <div class="button-row">
+            <button id="btn-export" class="btn-ghost">Export Data (JSON)</button>
+            <button id="btn-import" class="btn-ghost">Import Data</button>
+            <button id="btn-clear-data" class="btn-danger">Clear All Data</button>
+          </div>
+          <input type="file" id="import-file" accept=".json" hidden />
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Add Transaction Modal -->
+  <div id="modal-transaction" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2 id="modal-transaction-title">Add Transaction</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <form id="form-transaction">
+        <div class="form-tabs">
+          <button type="button" class="tab-btn active" data-type="expense">Expense</button>
+          <button type="button" class="tab-btn" data-type="income">Income</button>
+        </div>
+        <input type="hidden" id="txn-type" value="expense" />
+        <input type="hidden" id="txn-id" value="" />
+
+        <label>Amount</label>
+        <div class="amount-input">
+          <span class="currency-symbol" id="modal-currency-symbol">$</span>
+          <input type="number" id="txn-amount" placeholder="0.00" step="0.01" min="0" required />
+        </div>
+
+        <label>Description</label>
+        <input type="text" id="txn-description" placeholder="What was it for?" required />
+
+        <label>Category</label>
+        <select id="txn-category" required>
+          <option value="">Select category...</option>
+          <optgroup label="Expenses">
+            <option value="Housing">Housing</option>
+            <option value="Food & Dining">Food & Dining</option>
+            <option value="Transport">Transport</option>
+            <option value="Health">Health</option>
+            <option value="Entertainment">Entertainment</option>
+            <option value="Shopping">Shopping</option>
+            <option value="Utilities">Utilities</option>
+            <option value="Education">Education</option>
+            <option value="Personal Care">Personal Care</option>
+            <option value="Other">Other</option>
+          </optgroup>
+          <optgroup label="Income">
+            <option value="Salary">Salary</option>
+            <option value="Freelance">Freelance</option>
+            <option value="Investment">Investment</option>
+            <option value="Gift">Gift</option>
+            <option value="Other Income">Other Income</option>
+          </optgroup>
+        </select>
+
+        <label>Date</label>
+        <input type="date" id="txn-date" required />
+
+        <label>Notes (optional)</label>
+        <input type="text" id="txn-notes" placeholder="Any extra details..." />
+
+        <div class="modal-actions">
+          <button type="button" class="btn-ghost modal-close-btn">Cancel</button>
+          <button type="submit" class="btn-primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add Budget Modal -->
+  <div id="modal-budget" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2>Add Budget</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <form id="form-budget">
+        <input type="hidden" id="budget-id" value="" />
+        <label>Category</label>
+        <select id="budget-category" required>
+          <option value="">Select category...</option>
+          <option value="Housing">Housing</option>
+          <option value="Food & Dining">Food & Dining</option>
+          <option value="Transport">Transport</option>
+          <option value="Health">Health</option>
+          <option value="Entertainment">Entertainment</option>
+          <option value="Shopping">Shopping</option>
+          <option value="Utilities">Utilities</option>
+          <option value="Education">Education</option>
+          <option value="Personal Care">Personal Care</option>
+          <option value="Other">Other</option>
+        </select>
+
+        <label>Monthly Limit</label>
+        <div class="amount-input">
+          <span class="currency-symbol" id="budget-currency-symbol">$</span>
+          <input type="number" id="budget-amount" placeholder="0.00" step="0.01" min="0" required />
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-ghost modal-close-btn">Cancel</button>
+          <button type="submit" class="btn-primary">Save Budget</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="js/db.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/ai.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
