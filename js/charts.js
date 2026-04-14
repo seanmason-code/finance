@@ -26,7 +26,7 @@ const Charts = (() => {
     const canvas = document.getElementById('chart-categories');
     if (!canvas) return;
 
-    const expenses = transactions.filter(t => t.type === 'expense');
+    const expenses = transactions.filter(t => t.type === 'expense' && t.category !== 'Transfer');
     const totals = {};
     expenses.forEach(t => {
       totals[t.category] = (totals[t.category] || 0) + t.amount;
@@ -88,7 +88,7 @@ const Charts = (() => {
       labels.push(d.toLocaleDateString('en', { month: 'short', year: '2-digit' }));
 
       const monthTxns = transactions.filter(t => t.date.startsWith(key));
-      incomeData.push(monthTxns.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0));
+      incomeData.push(monthTxns.filter(t => t.type === 'income' && t.category !== 'Transfer').reduce((s, t) => s + t.amount, 0));
       expenseData.push(monthTxns.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0));
     }
 
@@ -145,7 +145,7 @@ const Charts = (() => {
 
     const actualByCategory = {};
     transactions
-      .filter(t => t.type === 'expense' && t.date.startsWith(monthKey))
+      .filter(t => t.type === 'expense' && t.category !== 'Transfer' && t.date.startsWith(monthKey))
       .forEach(t => { actualByCategory[t.category] = (actualByCategory[t.category] || 0) + t.amount; });
 
     const labels = budgets.map(b => b.category);
@@ -193,7 +193,7 @@ const Charts = (() => {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       labels.push(d.toLocaleDateString('en', { month: 'short', year: '2-digit' }));
-      actualData.push(transactions.filter(t => t.type === 'expense' && t.date.startsWith(key)).reduce((s, t) => s + t.amount, 0));
+      actualData.push(transactions.filter(t => t.type === 'expense' && t.category !== 'Transfer' && t.date.startsWith(key)).reduce((s, t) => s + t.amount, 0));
       budgetData.push(totalBudget);
     }
 
@@ -231,7 +231,7 @@ const Charts = (() => {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       labels.push(d.toLocaleDateString('en', { month: 'short', year: '2-digit' }));
-      data.push(transactions.filter(t => t.type === 'expense' && t.date.startsWith(key)).reduce((s, t) => s + t.amount, 0));
+      data.push(transactions.filter(t => t.type === 'expense' && t.category !== 'Transfer' && t.date.startsWith(key)).reduce((s, t) => s + t.amount, 0));
     }
 
     if (spendingTrendChart) spendingTrendChart.destroy();
@@ -261,7 +261,7 @@ const Charts = (() => {
 
     const byMerchant = {};
     transactions
-      .filter(t => t.type === 'expense' && t.date.startsWith(monthKey))
+      .filter(t => t.type === 'expense' && t.category !== 'Transfer' && t.date.startsWith(monthKey))
       .forEach(t => { byMerchant[t.description] = (byMerchant[t.description] || 0) + t.amount; });
 
     const sorted = Object.entries(byMerchant).sort((a, b) => b[1] - a[1]).slice(0, 10);

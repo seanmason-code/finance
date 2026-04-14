@@ -222,8 +222,8 @@ const App = (() => {
     const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     const monthTxns = transactions.filter(t => t.date.startsWith(thisMonth));
 
-    const income = monthTxns.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
-    const expenses = monthTxns.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+    const income = monthTxns.filter(t => t.type === 'income' && t.category !== 'Transfer').reduce((s, t) => s + t.amount, 0);
+    const expenses = monthTxns.filter(t => t.type === 'expense' && t.category !== 'Transfer').reduce((s, t) => s + t.amount, 0);
     const net = income - expenses;
 
     const weeklyIncome = income * 12 / 52;
@@ -474,6 +474,7 @@ const App = (() => {
       'Housing': '🏠', 'Food & Dining': '🍽️', 'Transport': '🚗', 'Health': '💊',
       'Entertainment': '🎬', 'Shopping': '🛍️', 'Utilities': '💡', 'Kids': '👶',
       'Education': '📚', 'Personal Care': '💇', 'Savings': '🏦', 'Personal Spending': '🎉',
+      'Transfer': '🔁',
       'Salary': '💼', 'Freelance': '💻', 'Rental Income': '🏡',
       'Investment': '📈', 'Gift': '🎁', 'Other Income': '💰', 'Other': '📌'
     };
@@ -1055,13 +1056,15 @@ const App = (() => {
       <option value="Kids">Kids</option>
       <option value="Savings">Savings</option>
       <option value="Personal Care">Personal Care</option>
-      <option value="Other">Other</option>`;
+      <option value="Other">Other</option>
+      <option value="Transfer">🔁 Transfer</option>`;
     const incomeOpts = `<option value="">Select category...</option>
       <option value="Salary">Salary</option>
       <option value="Rental Income">Rental Income</option>
       <option value="Freelance">Freelance</option>
       <option value="Investment">Investment</option>
-      <option value="Other Income">Other Income</option>`;
+      <option value="Other Income">Other Income</option>
+      <option value="Transfer">🔁 Transfer</option>`;
     sel.innerHTML = type === 'income' ? incomeOpts : expenseOpts;
   }
 
@@ -1241,6 +1244,7 @@ const App = (() => {
     document.getElementById('import-file')?.addEventListener('change', importData);
     document.getElementById('btn-clear-data')?.addEventListener('click', clearAllData);
     document.getElementById('btn-remove-duplicates')?.addEventListener('click', removeDuplicates);
+    document.getElementById('btn-find-transfers')?.addEventListener('click', findAndLabelTransfers);
   }
 
   function exportData() {
@@ -1324,6 +1328,72 @@ const App = (() => {
     btn.disabled = false;
     btn.textContent = 'Find & Remove Duplicates';
     resultEl.textContent = `Done — removed ${removed} duplicate${removed !== 1 ? 's' : ''}.`;
+    refreshCurrentPage();
+  }
+
+  async function findAndLabelTransfers() {
+    const resultEl = document.getElementById('transfer-result');
+    const btn = document.getElementById('btn-find-transfers');
+    btn.disabled = true;
+    btn.textContent = 'Scanning...';
+    resultEl.textContent = '';
+
+    // NZ bank account number patterns
+    const accountPatterns = [
+      /^\d{2}-\d{4}-\d{7}-\d{2}/,   // 38-9020-0211287-05
+      /^\d{2}-\d{4}-\d{6}-\d{2}/,    // 01-0902-034664-00
+      /^\d{3}-\d{4}-\d{3}/,           // 012-3236-009
+      /^\d{2}-\d{4}-\d{7}/,           // shorter variant
+    ];
+    const transferKeywords = [
+      'transfer', 'trf', 'internet banking', 'online banking',
+      'between accounts', 'own account', 'savings transfer',
+      'mortgage', 'loan payment', 'from account', 'to account',
+    ];
+
+    const candidates = transactions.filter(t => {
+      if (t.category === 'Transfer') return false; // already labelled
+      const desc = (t.description || '').toLowerCase();
+      const matchesPattern = accountPatterns.some(p => p.test(t.description || ''));
+      const matchesKeyword = transferKeywords.some(k => desc.includes(k));
+      return matchesPattern || matchesKeyword;
+    });
+
+    btn.disabled = false;
+    btn.textContent = '🔁 Find & Label Transfers';
+
+    if (candidates.length === 0) {
+      resultEl.textContent = 'No transfers found — all looking clean.';
+      return;
+    }
+
+    // Show preview
+    const preview = candidates.slice(0, 5).map(t => `• ${t.date} — ${t.description} (${formatCurrency(t.amount)})`).join('\n');
+    const more = candidates.length > 5 ? `\n...and ${candidates.length - 5} more` : '';
+    const confirmed = confirm(
+      `Found ${candidates.length} likely transfer${candidates.length !== 1 ? 's' : ''}:\n\n${preview}${more}\n\nLabel all as Transfer? (Excludes them from income/expense totals)`
+    );
+
+    if (!confirmed) { resultEl.textContent = 'Cancelled.'; return; }
+
+    btn.disabled = true;
+    let updated = 0;
+    for (const t of candidates) {
+      try {
+        const updatedTxn = { ...t, category: 'Transfer' };
+        await SB.upsertTransaction(updatedTxn);
+        const idx = transactions.findIndex(x => x.id === t.id);
+        if (idx !== -1) transactions[idx] = updatedTxn;
+        updated++;
+        btn.textContent = `Labelling... ${Math.round((updated / candidates.length) * 100)}%`;
+      } catch (err) {
+        console.error('Failed to update transfer:', err);
+      }
+    }
+
+    btn.disabled = false;
+    btn.textContent = '🔁 Find & Label Transfers';
+    resultEl.textContent = `Done — labelled ${updated} transaction${updated !== 1 ? 's' : ''} as Transfer.`;
     refreshCurrentPage();
   }
 
