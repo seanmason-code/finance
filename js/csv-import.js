@@ -1,13 +1,16 @@
-// ===== CSV Import (Kiwibank) =====
+// ===== CSV Import (Kiwibank + ANZ) =====
 const CSVImport = (() => {
-  const OWN_PREFIXES = ['38-9020', '38-9018'];
+  const KIWIBANK_OWN = ['38-9020', '38-9018'];
+  const ANZ_OWN = ['01-0902'];
 
   const EXP_CATS = [
     'Housing', 'Food & Dining', 'Transport', 'Health',
     'Entertainment', 'Shopping', 'Utilities', 'Education',
     'Personal Care', 'Other'
   ];
-  const INC_CATS = ['Salary', 'Freelance', 'Investment', 'Gift', 'Other Income'];
+  const INC_CATS = ['Salary', 'Freelance', 'Investment', 'Gift', 'Rental Income', 'Other Income'];
+
+  // ===== CSV parsing =====
 
   function parseCSV(text) {
     const lines = text.replace(/\r/g, '').split('\n').filter(l => l.trim());
@@ -16,7 +19,7 @@ const CSVImport = (() => {
     const rows = [];
     for (let i = 1; i < lines.length; i++) {
       const cells = parseCSVLine(lines[i]);
-      if (cells.length < 14) continue;
+      if (cells.length < 2) continue;
       const obj = {};
       header.forEach((h, idx) => { obj[h.trim()] = (cells[idx] || '').trim(); });
       rows.push(obj);
@@ -36,57 +39,142 @@ const CSVImport = (() => {
     return result;
   }
 
-  function isInternal(row) {
-    const other = (row['Other Party Account Number'] || '').trim();
-    return other.length > 0 && OWN_PREFIXES.some(p => other.startsWith(p));
+  function detectFormat(rows) {
+    if (!rows.length) return 'unknown';
+    const keys = Object.keys(rows[0]);
+    if (keys.includes('Transaction Code')) return 'kiwibank';
+    if (keys.includes('Type') && keys.includes('Details')) return 'anz';
+    return 'unknown';
   }
 
-  function buildDescription(row) {
+  // ===== Kiwibank =====
+
+  function isInternalKiwibank(row) {
+    const other = (row['Other Party Account Number'] || '').trim();
+    return other.length > 0 && KIWIBANK_OWN.some(p => other.startsWith(p));
+  }
+
+  function buildDescKiwibank(row) {
     const txCode = (row['Transaction Code'] || '').trim();
     const desc = (row['Description'] || '').trim();
     const other = (row['Other Party Name'] || '').trim();
 
     if (txCode === 'EFTPOS PURCHASE') {
-      // Remove trailing timestamp like "-09:36" or "- 12:31"
       return desc.replace(/\s*[-–]\s*\d{2}:\d{2}$/, '')
                  .replace(/^POS W\/D\s+/i, '')
                  .trim();
     }
-    if ((txCode === 'DIRECT CREDIT' || txCode === 'DIRECT DEBIT') && other) {
-      return other;
-    }
+    if ((txCode === 'DIRECT CREDIT' || txCode === 'DIRECT DEBIT') && other) return other;
     if (txCode === 'INTEREST CREDIT') return 'Interest Credit';
     if (txCode === 'IRD WITHHOLDING TAX') return 'IRD Withholding Tax';
-    if (txCode === 'CREDIT TRANSFER' && other) return other;
-    if (txCode === 'DEBIT TRANSFER' && other) return other;
+    if ((txCode === 'CREDIT TRANSFER' || txCode === 'DEBIT TRANSFER') && other) return other;
     return desc;
   }
 
-  function autoCategory(desc, txCode, amount) {
+  function processKiwibank(rawRows, skipInternal) {
+    return rawRows
+      .filter(row => !skipInternal || !isInternalKiwibank(row))
+      .map(row => {
+        const amount = parseFloat(row['Amount']) || 0;
+        const type = amount >= 0 ? 'income' : 'expense';
+        const desc = buildDescKiwibank(row);
+        const date = (row['Transaction Date'] || row['Effective Date'] || '').slice(0, 10);
+        const category = autoCategory(desc, row['Transaction Code'] || '', amount);
+        return {
+          date, description: desc, amount: Math.abs(amount), type, category,
+          account: row['Account number'] || '',
+          _internal: isInternalKiwibank(row),
+        };
+      })
+      .filter(r => r.date && r.amount > 0);
+  }
+
+  // ===== ANZ =====
+
+  function parseANZDate(s) {
+    // DD/MM/YYYY → YYYY-MM-DD
+    const parts = s.split('/');
+    if (parts.length !== 3) return s;
+    return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+  }
+
+  function isInternalANZ(row) {
+    const details = (row['Details'] || '').trim();
+    const type = (row['Type'] || '').trim();
+    // Transfer to/from another ANZ account
+    if (type === 'Transfer' && /^\d{2}-\d{4}/.test(details)) return true;
+    // Bill payment to own joint account by name
+    if (/J L Schafer.*S Mason|S Mason.*J L Schafer/i.test(details) && type === 'Bill Payment') return true;
+    return false;
+  }
+
+  function buildDescANZ(row) {
+    const type = (row['Type'] || '').trim();
+    const details = (row['Details'] || '').trim();
+    const particulars = (row['Particulars'] || '').trim();
+    const code = (row['Code'] || '').trim();
+
+    // "Direct Debit To" is a useless description — use Particulars or Code
+    if (details === 'Direct Debit To') {
+      if (particulars && !/^\d{2}-\d{4}/.test(particulars)) return particulars;
+      if (code && code !== 'Transfer') return code;
+      return 'Direct Debit';
+    }
+
+    // Add Particulars for extra context when it's meaningful
+    if (particulars && particulars !== 'Debit' && particulars !== 'Credit' && particulars !== 'Transfer') {
+      return `${details} - ${particulars}`;
+    }
+    return details;
+  }
+
+  function processANZ(rawRows, skipInternal, filename) {
+    const accountFromFile = (filename || '').match(/(\d{2}-\d{4}-\d{7}-\d{2})/)?.[1] || 'ANZ';
+    return rawRows
+      .filter(row => !skipInternal || !isInternalANZ(row))
+      .map(row => {
+        const amount = parseFloat(row['Amount']) || 0;
+        const type = amount >= 0 ? 'income' : 'expense';
+        const desc = buildDescANZ(row);
+        const date = parseANZDate(row['Date'] || '');
+        const category = autoCategory(desc, row['Type'] || '', amount);
+        return {
+          date, description: desc, amount: Math.abs(amount), type, category,
+          account: accountFromFile,
+          _internal: isInternalANZ(row),
+        };
+      })
+      .filter(r => r.date && r.date.match(/^\d{4}-\d{2}-\d{2}$/) && r.amount > 0);
+  }
+
+  // ===== Auto-categorisation (shared) =====
+
+  function autoCategory(desc, txType, amount) {
     const d = desc.toUpperCase();
 
     if (amount >= 0) {
       if (/WAGES|SALARY|PAYROLL/.test(d)) return 'Salary';
       if (/INTEREST/.test(d)) return 'Investment';
-      if (/RENT|RENTAL/.test(d)) return 'Other Income';
-      if (txCode === 'DIRECT CREDIT') return 'Salary';
+      if (/RENT|RENTAL|ANEMAX/.test(d)) return 'Rental Income';
+      if (/HOLIDAY.*PAYOUT|PAYOUT.*HOLIDAY/.test(d)) return 'Other Income';
+      if (txType === 'DIRECT CREDIT' || txType === 'Direct Credit') return 'Salary';
       return 'Other Income';
     }
 
     // Groceries / supermarkets
     if (/PAK.?N.?SAVE|COUNTDOWN|WOOLWORTH|NEW WORLD|FRESH CHOICE|FOUR SQUARE|SUPERETTE|VEGETA/.test(d)) return 'Food & Dining';
     // Cafes, restaurants, takeaways
-    if (/CAFE|COFFEE|LUNCHBAR|SUSHI|RESTAURANT|PIZZA|BURGER|BAKERY|TAKEAWAY|KFC|MCDONALD|SUBWAY|DOMINO|NOODLE|CHICKEN|CHIP.?SHOP|UBER.*EAT|UBEREATS|BISTRO|EATERY|DINER|GRILL|LUNCH|DINNER|BRUNCH/.test(d)) return 'Food & Dining';
-    if (/\bBAR\b/.test(d) && !/SIDEBAR|TOOLBAR/.test(d)) return 'Food & Dining';
+    if (/CAFE|COFFEE|LUNCHBAR|SUSHI|RESTAURANT|PIZZA|BURGER|BAKERY|TAKEAWAY|KFC|MCDONALD|SUBWAY|DOMINO|NOODLE|CHICKEN|CHIP.?SHOP|UBER.*EAT|UBEREATS|BISTRO|EATERY|DINER|GRILL/.test(d)) return 'Food & Dining';
+    if (/\bBAR\b/.test(d)) return 'Food & Dining';
     // Transport
     if (/\bBP\b|BP 2GO|\bZ \b|Z ENERGY|\bMOBIL\b|GULL|CALTEX|WAITOMO|PETROL|FUEL/.test(d)) return 'Transport';
     if (/PARK(M?ATE|ING|\s)|WILSON P|AT HOP|AUCKLAND TRANSPORT|AKLD TRANSPORT|FERRY|TRAIN|BUS TICKET/.test(d)) return 'Transport';
     if (/\bUBER\b/.test(d) && !/EAT/.test(d)) return 'Transport';
-    // Mortgage / Housing
-    if (/MORTGAGE|RENT\b/.test(d)) return 'Housing';
+    // Housing
+    if (/MORTGAGE|RATES|BODY CORP/.test(d)) return 'Housing';
     // Utilities
     if (/POWER|ELECTRICITY|CONTACT ENERGY|MERIDIAN|GENESIS|VECTOR|WATER SUPPLY|BROADBAND|INTERNET/.test(d)) return 'Utilities';
-    if (/\bSPARK\b|VODAFONE|2DEGREES|ONE NZ|ORCON|SKINNY|SLINGSHOT/.test(d)) return 'Utilities';
+    if (/\bSPARK\b|VODAFONE|2DEGREES|ONE NZ|ORCON|SKINNY|SLINGSHOT|KIWIBANK.*BILLS|BILLS.*KIWIBANK/.test(d)) return 'Utilities';
     // Health
     if (/PHARMACY|CHEMIST|DOCTOR|MEDICAL|HEALTH|DENTAL|OPTOM|VISION|HOSPITAL|PHYSIO|CLINIC/.test(d)) return 'Health';
     // Entertainment
@@ -101,29 +189,13 @@ const CSVImport = (() => {
     return 'Other';
   }
 
-  function processRows(rawRows, skipInternal) {
-    return rawRows
-      .filter(row => !skipInternal || !isInternal(row))
-      .map(row => {
-        const amount = parseFloat(row['Amount']) || 0;
-        const absAmount = Math.abs(amount);
-        const type = amount >= 0 ? 'income' : 'expense';
-        const desc = buildDescription(row);
-        const date = (row['Transaction Date'] || row['Effective Date'] || '').slice(0, 10);
-        const txCode = row['Transaction Code'] || '';
-        const category = autoCategory(desc, txCode, amount);
-        return {
-          date,
-          description: desc,
-          amount: absAmount,
-          type,
-          category,
-          account: row['Account number'] || '',
-          _internal: isInternal(row),
-          _selected: true,
-        };
-      })
-      .filter(r => r.date && r.amount > 0);
+  // ===== Public API =====
+
+  function processRows(rawRows, skipInternal, filename) {
+    const format = detectFormat(rawRows);
+    if (format === 'kiwibank') return processKiwibank(rawRows, skipInternal);
+    if (format === 'anz') return processANZ(rawRows, skipInternal, filename);
+    return [];
   }
 
   function categoryOptionsHTML(selected, type) {

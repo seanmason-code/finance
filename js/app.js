@@ -8,6 +8,7 @@ const App = (() => {
   let editingTxnId = null;
   let _importRows = [];
   let _rawCSVText = null;
+  let _importFilename = '';
 
   // ===== Boot: setup → login → app =====
   async function boot() {
@@ -907,6 +908,7 @@ const App = (() => {
       const file = e.target.files[0];
       if (!file) return;
       _rawCSVText = await file.text();
+      _importFilename = file.name;
       openImportModal();
       e.target.value = '';
     });
@@ -914,7 +916,7 @@ const App = (() => {
     document.getElementById('import-skip-internal')?.addEventListener('change', () => {
       if (!_rawCSVText) return;
       const rawRows = CSVImport.parseCSV(_rawCSVText);
-      _importRows = CSVImport.processRows(rawRows, document.getElementById('import-skip-internal').checked);
+      _importRows = CSVImport.processRows(rawRows, document.getElementById('import-skip-internal').checked, _importFilename);
       renderImportTable();
     });
 
@@ -929,7 +931,7 @@ const App = (() => {
   function openImportModal() {
     const rawRows = CSVImport.parseCSV(_rawCSVText);
     const skipInternal = document.getElementById('import-skip-internal').checked;
-    _importRows = CSVImport.processRows(rawRows, skipInternal);
+    _importRows = CSVImport.processRows(rawRows, skipInternal, _importFilename);
     renderImportTable();
     document.getElementById('modal-import').classList.remove('hidden');
   }
@@ -998,7 +1000,7 @@ const App = (() => {
         amount: row.amount,
         type: row.type,
         category: row.category,
-        notes: `Kiwibank import (${row.account})`,
+        notes: `Bank import (${row.account})`,
       };
       try {
         await SB.upsertTransaction(t);
