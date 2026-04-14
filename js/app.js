@@ -239,13 +239,13 @@ const App = (() => {
     if (expWk) expWk.textContent = `${formatCurrency(weeklyExpenses)}/wk`;
     if (netWk) netWk.textContent = `${formatCurrency(net * 12 / 52)}/wk`;
 
-    renderPaceCard(expenses);
+    renderPaceCard(income, expenses);
     Charts.renderCategoryChart(monthTxns);
     Charts.renderTimelineChart(transactions);
     renderRecentTransactions();
   }
 
-  function renderPaceCard(expenses) {
+  function renderPaceCard(income, expenses) {
     const card = document.getElementById('pace-card');
     if (!card) return;
 
@@ -253,19 +253,33 @@ const App = (() => {
     const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     const dayOfMonth = now.getDate();
     const totalBudget = budgets.reduce((s, b) => s + b.amount, 0);
-
-    if (totalBudget === 0) { card.innerHTML = ''; return; }
-
-    const expected = (dayOfMonth / daysInMonth) * totalBudget;
-    const diff = expected - expenses;
-    const ahead = diff >= 0;
     const monthName = now.toLocaleDateString('en', { month: 'long' });
+
+    // If no income recorded yet, fall back to expense-only pace
+    if (income === 0 && totalBudget === 0) { card.innerHTML = ''; return; }
+
+    let ahead, diff, detail;
+
+    if (income > 0) {
+      // Option B: net position — income received minus expenses vs expected net
+      const net = income - expenses;
+      const expectedNet = (dayOfMonth / daysInMonth) * totalBudget * 0.05; // small positive buffer expected
+      ahead = net >= 0;
+      diff = Math.abs(net);
+      detail = `Received ${formatCurrency(income)} · Spent ${formatCurrency(expenses)} in ${monthName}`;
+    } else {
+      // Fallback: expense pace only
+      const expected = (dayOfMonth / daysInMonth) * totalBudget;
+      diff = Math.abs(expected - expenses);
+      ahead = expenses <= expected;
+      detail = `Spent ${formatCurrency(expenses)} of ${formatCurrency(expected)} expected in ${monthName}`;
+    }
 
     card.innerHTML = `
       <div class="pace-card ${ahead ? 'ahead' : 'behind'}">
         <div class="pace-status">${ahead ? '✅' : '⚠️'} ${ahead ? 'AHEAD' : 'BEHIND'}</div>
-        <div class="pace-amount">${formatCurrency(Math.abs(diff))} ${ahead ? 'under' : 'over'} pace</div>
-        <div class="pace-detail">Spent ${formatCurrency(expenses)} of ${formatCurrency(expected)} expected in ${monthName}</div>
+        <div class="pace-amount">${ahead ? '+' : '-'}${formatCurrency(diff)} net position</div>
+        <div class="pace-detail">${detail}</div>
         ${!ahead ? `<button class="pace-drill" id="btn-pace-drill">→ See what's over budget</button>` : ''}
       </div>
     `;
