@@ -548,22 +548,23 @@ const App = (() => {
       // If editing category, offer to apply to all matching descriptions
       if (isEdit) {
         const norm = s => (s || '').replace(/\s+/g, ' ').trim().toLowerCase();
-        const matches = transactions.filter(x =>
+        const merchantBase = s => norm(s).split(/[\/\-\d]/)[0].trim();
+
+        const exact = transactions.filter(x =>
           x.id !== id &&
           norm(x.description) === norm(t.description) &&
           x.category !== t.category
         );
-        if (matches.length > 0) {
-          const apply = confirm(`Apply "${t.category}" to all ${matches.length} other transaction${matches.length !== 1 ? 's' : ''} named "${t.description}"?`);
-          if (apply) {
-            for (const m of matches) {
-              const updated = { ...m, category: t.category };
-              await SB.upsertTransaction(updated);
-              const i = transactions.findIndex(x => x.id === m.id);
-              if (i >= 0) transactions[i] = updated;
-            }
-            showToast(`Updated ${matches.length} transaction${matches.length !== 1 ? 's' : ''} to "${t.category}"`);
-          }
+        const partial = transactions.filter(x =>
+          x.id !== id &&
+          norm(x.description) !== norm(t.description) &&
+          merchantBase(x.description) === merchantBase(t.description) &&
+          merchantBase(t.description).length >= 4 &&
+          x.category !== t.category
+        );
+
+        if (exact.length > 0 || partial.length > 0) {
+          openBulkCategoryModal(t.category, exact, partial);
         }
       }
 
@@ -585,6 +586,55 @@ const App = (() => {
     } catch (err) {
       alert('Failed to delete: ' + err.message);
     }
+  }
+
+  // ===== Bulk Category Modal =====
+  function openBulkCategoryModal(category, exact, partial) {
+    const list = document.getElementById('bulk-cat-list');
+    const subtitle = document.getElementById('bulk-cat-subtitle');
+    subtitle.textContent = `Applying category: "${category}"`;
+
+    const allMatches = [
+      ...exact.map(t => ({ t, isExact: true })),
+      ...partial.map(t => ({ t, isExact: false })),
+    ];
+
+    list.innerHTML = allMatches.map(({ t, isExact }) => `
+      <label class="bulk-cat-item">
+        <input type="checkbox" class="bulk-cat-check" data-id="${t.id}" ${isExact ? 'checked' : 'checked'} />
+        <div class="bulk-cat-info">
+          <div class="bulk-cat-desc">${escHtml(t.description)}</div>
+          <div class="bulk-cat-meta">${t.date} · ${formatCurrency(t.amount)} · was: ${escHtml(t.category || 'uncategorised')}${!isExact ? ' · <em>partial match</em>' : ''}</div>
+        </div>
+      </label>
+    `).join('');
+
+    document.getElementById('bulk-select-all').onclick = () =>
+      list.querySelectorAll('.bulk-cat-check').forEach(c => c.checked = true);
+    document.getElementById('bulk-deselect-all').onclick = () =>
+      list.querySelectorAll('.bulk-cat-check').forEach(c => c.checked = false);
+
+    document.getElementById('btn-bulk-apply').onclick = async () => {
+      const selected = [...list.querySelectorAll('.bulk-cat-check:checked')].map(c => c.dataset.id);
+      if (selected.length === 0) { closeModals(); return; }
+      let count = 0;
+      for (const sid of selected) {
+        const txn = transactions.find(x => x.id === sid);
+        if (!txn) continue;
+        const updated = { ...txn, category };
+        try {
+          await SB.upsertTransaction(updated);
+          const i = transactions.findIndex(x => x.id === sid);
+          if (i >= 0) transactions[i] = updated;
+          count++;
+        } catch {}
+      }
+      closeModals();
+      refreshCurrentPage();
+      showToast(`Updated ${count} transaction${count !== 1 ? 's' : ''} to "${category}"`);
+    };
+
+    document.getElementById('modal-bulk-category').classList.remove('hidden');
   }
 
   // ===== Budgets =====

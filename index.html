@@ -455,6 +455,27 @@
     </div>
   </div>
 
+  <!-- Bulk Category Modal -->
+  <div id="modal-bulk-category" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2>Apply Category to Matches</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <p id="bulk-cat-subtitle" class="hint" style="margin-bottom:12px;"></p>
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+        <button id="bulk-select-all" class="btn-ghost" style="font-size:12px;padding:4px 10px;">Select all</button>
+        <button id="bulk-deselect-all" class="btn-ghost" style="font-size:12px;padding:4px 10px;">Deselect all</button>
+      </div>
+      <div id="bulk-cat-list" style="max-height:340px;overflow-y:auto;"></div>
+      <div class="modal-actions" style="margin-top:16px;">
+        <button type="button" class="btn-ghost modal-close-btn">Cancel</button>
+        <button id="btn-bulk-apply" class="btn-primary">Apply to Selected</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Line Item Modal -->
   <div id="modal-line-item" class="modal hidden">
     <div class="modal-backdrop"></div>
