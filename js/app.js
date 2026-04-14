@@ -785,6 +785,8 @@ const App = (() => {
     document.getElementById('line-item-id').value = '';
     document.getElementById('form-line-item').reset();
     document.getElementById('line-item-modal-title').textContent = 'Add Item';
+    document.getElementById('line-item-move-label').classList.add('hidden');
+    document.getElementById('line-item-move-to').classList.add('hidden');
     document.getElementById('modal-line-item').classList.remove('hidden');
   }
 
@@ -799,6 +801,17 @@ const App = (() => {
     document.getElementById('line-item-amount').value = item.amount;
     document.getElementById('line-item-due').value = item.dueDate || '';
     document.getElementById('line-item-note').value = item.note || '';
+
+    // Populate move-to dropdown with all other categories
+    const select = document.getElementById('line-item-move-to');
+    select.innerHTML = '<option value="">— stay in current category —</option>' +
+      budgets.filter(b => b.id !== budgetId)
+        .map(b => `<option value="${b.id}">${categoryIcon(b.category)} ${escHtml(b.category)}</option>`)
+        .join('');
+    select.value = '';
+    document.getElementById('line-item-move-label').classList.remove('hidden');
+    select.classList.remove('hidden');
+
     document.getElementById('line-item-modal-title').textContent = 'Edit Item';
     document.getElementById('modal-line-item').classList.remove('hidden');
   }
@@ -811,17 +824,39 @@ const App = (() => {
     const amount = parseFloat(document.getElementById('line-item-amount').value);
     const dueDate = document.getElementById('line-item-due').value.trim();
     const note = document.getElementById('line-item-note').value.trim();
+    const moveToBudgetId = document.getElementById('line-item-move-to').value;
 
     const budget = budgets.find(b => b.id === budgetId);
     if (!budget) return;
 
     if (!budget.items) budget.items = [];
 
+    const updatedItem = { id: itemId || crypto.randomUUID(), name, amount, dueDate, note };
+
+    // Handle move to different category
+    if (itemId && moveToBudgetId) {
+      const targetBudget = budgets.find(b => b.id === moveToBudgetId);
+      if (targetBudget) {
+        budget.items = budget.items.filter(i => i.id !== itemId);
+        budget.amount = budget.items.reduce((s, i) => s + i.amount, 0);
+        if (!targetBudget.items) targetBudget.items = [];
+        targetBudget.items.push(updatedItem);
+        targetBudget.amount = targetBudget.items.reduce((s, i) => s + i.amount, 0);
+        try {
+          await upsertBudgetSafe(budget);
+          await upsertBudgetSafe(targetBudget);
+          closeModals();
+          renderBudgets();
+        } catch (err) { alert('Failed to move item: ' + err.message); }
+        return;
+      }
+    }
+
     if (itemId) {
       const idx = budget.items.findIndex(i => i.id === itemId);
-      if (idx >= 0) budget.items[idx] = { id: itemId, name, amount, dueDate, note };
+      if (idx >= 0) budget.items[idx] = updatedItem;
     } else {
-      budget.items.push({ id: crypto.randomUUID(), name, amount, dueDate, note });
+      budget.items.push(updatedItem);
     }
 
     budget.amount = budget.items.reduce((s, i) => s + i.amount, 0);
