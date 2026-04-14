@@ -644,8 +644,35 @@ const App = (() => {
         document.querySelectorAll('.tab-btn-r').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         document.getElementById('recurring-type').value = btn.dataset.type;
+        updateRecurringCategories(btn.dataset.type);
       });
     });
+  }
+
+  function updateRecurringCategories(type) {
+    const sel = document.getElementById('recurring-category');
+    const expenseOpts = `<option value="">Select category...</option>
+      <option value="Housing">Housing</option>
+      <option value="Mortgage">Mortgage</option>
+      <option value="Rates">Rates</option>
+      <option value="Food & Dining">Food & Dining</option>
+      <option value="Transport">Transport</option>
+      <option value="Health">Health</option>
+      <option value="Entertainment">Entertainment</option>
+      <option value="Shopping">Shopping</option>
+      <option value="Utilities">Utilities</option>
+      <option value="Education">Education</option>
+      <option value="Kids">Kids</option>
+      <option value="Savings">Savings</option>
+      <option value="Personal Care">Personal Care</option>
+      <option value="Other">Other</option>`;
+    const incomeOpts = `<option value="">Select category...</option>
+      <option value="Salary">Salary</option>
+      <option value="Rental Income">Rental Income</option>
+      <option value="Freelance">Freelance</option>
+      <option value="Investment">Investment</option>
+      <option value="Other Income">Other Income</option>`;
+    sel.innerHTML = type === 'income' ? incomeOpts : expenseOpts;
   }
 
   function openAddRecurring() {
@@ -653,6 +680,7 @@ const App = (() => {
     document.getElementById('form-recurring').reset();
     document.getElementById('recurring-type').value = 'expense';
     document.querySelectorAll('.tab-btn-r').forEach(b => b.classList.toggle('active', b.dataset.type === 'expense'));
+    updateRecurringCategories('expense');
     document.getElementById('modal-recurring-title').textContent = 'Add Recurring';
     document.getElementById('modal-recurring').classList.remove('hidden');
   }
@@ -668,6 +696,8 @@ const App = (() => {
     document.getElementById('recurring-frequency').value = r.frequency;
     document.getElementById('recurring-day').value = r.day_of_month;
     document.querySelectorAll('.tab-btn-r').forEach(b => b.classList.toggle('active', b.dataset.type === r.type));
+    updateRecurringCategories(r.type);
+    document.getElementById('recurring-category').value = r.category;
     document.getElementById('modal-recurring-title').textContent = 'Edit Recurring';
     document.getElementById('modal-recurring').classList.remove('hidden');
   }
