@@ -425,12 +425,14 @@ const App = (() => {
       { name: 'School Holidays',     amount: 100, dueDate: '', note: 'to arrange' },
       { name: 'Swimming Lessons',    amount: 77,  dueDate: '', note: '' },
     ]},
-    { category: 'Savings', amount: 1892, items: [
+    { category: 'Savings', amount: 1458, items: [
       { name: 'Fiji Savings',    amount: 333,  dueDate: '',   note: 'ANZ' },
       { name: 'House Savings',   amount: 1000, dueDate: '17', note: 'DD · 17th' },
-      { name: 'Jenny',           amount: 217,  dueDate: '',   note: '' },
-      { name: 'Sean',            amount: 217,  dueDate: '',   note: '' },
       { name: 'Car Maintenance', amount: 125,  dueDate: '',   note: '' },
+    ]},
+    { category: 'Personal Spending', amount: 434, items: [
+      { name: 'Jenny', amount: 217, dueDate: '', note: 'free money' },
+      { name: 'Sean',  amount: 217, dueDate: '', note: 'free money' },
     ]},
     { category: 'Other', amount: 112, items: [
       { name: 'Vero',  amount: 88, dueDate: '16', note: 'DD · 16th · insurance' },
@@ -446,7 +448,7 @@ const App = (() => {
     const icons = {
       'Housing': '🏠', 'Food & Dining': '🍽️', 'Transport': '🚗', 'Health': '💊',
       'Entertainment': '🎬', 'Shopping': '🛍️', 'Utilities': '💡', 'Kids': '👶',
-      'Education': '📚', 'Personal Care': '💇', 'Savings': '🏦',
+      'Education': '📚', 'Personal Care': '💇', 'Savings': '🏦', 'Personal Spending': '🎉',
       'Salary': '💼', 'Freelance': '💻',
       'Investment': '📈', 'Gift': '🎁', 'Other Income': '💰', 'Other': '📌'
     };
