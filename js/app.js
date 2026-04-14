@@ -474,7 +474,7 @@ const App = (() => {
       'Housing': '🏠', 'Food & Dining': '🍽️', 'Transport': '🚗', 'Health': '💊',
       'Entertainment': '🎬', 'Shopping': '🛍️', 'Utilities': '💡', 'Kids': '👶',
       'Education': '📚', 'Personal Care': '💇', 'Savings': '🏦', 'Personal Spending': '🎉',
-      'Salary': '💼', 'Freelance': '💻',
+      'Salary': '💼', 'Freelance': '💻', 'Rental Income': '🏡',
       'Investment': '📈', 'Gift': '🎁', 'Other Income': '💰', 'Other': '📌'
     };
     return icons[category] || '💳';
