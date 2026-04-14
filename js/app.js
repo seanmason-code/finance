@@ -363,54 +363,56 @@ const App = (() => {
 
   const PRESET_BUDGETS = [
     { category: 'Housing', amount: 1949, items: [
-      { name: 'Apples', amount: 1105 },
-      { name: 'Skids', amount: 563 },
-      { name: 'Tower Units', amount: 166 },
-      { name: 'Tower Home', amount: 115 },
+      { name: 'Apples',      amount: 1105, dueDate: 'weekly', note: 'AP · weekly' },
+      { name: 'Skids',       amount: 563,  dueDate: 'weekly', note: 'AP · weekly' },
+      { name: 'Tower Units', amount: 166,  dueDate: '25',     note: 'DD · 25th' },
+      { name: 'Tower Home',  amount: 115,  dueDate: '25',     note: 'DD · 25th' },
     ]},
     { category: 'Food & Dining', amount: 1625, items: [
-      { name: 'Food', amount: 1625 },
+      { name: 'Food', amount: 1625, dueDate: '', note: 'AP · weekly transfer' },
     ]},
     { category: 'Transport', amount: 996, items: [
-      { name: 'Fuel', amount: 563 },
-      { name: 'Parking', amount: 433 },
+      { name: 'Fuel',    amount: 563, dueDate: '', note: 'AP · weekly transfer' },
+      { name: 'Parking', amount: 433, dueDate: '', note: '' },
     ]},
     { category: 'Utilities', amount: 697, items: [
-      { name: 'Meridian', amount: 200 },
-      { name: 'Watercare', amount: 380 },
-      { name: 'Spark', amount: 117 },
+      { name: 'Meridian',  amount: 200, dueDate: '',   note: 'AP · monthly' },
+      { name: 'Watercare', amount: 380, dueDate: '',   note: 'AP · monthly' },
+      { name: 'Spark',     amount: 117, dueDate: '12', note: 'DD · 12th' },
     ]},
     { category: 'Health', amount: 695, items: [
-      { name: 'A.I.A (1)', amount: 158 },
-      { name: 'A.I.A (2)', amount: 229 },
-      { name: 'Snap Fitness (Jenny)', amount: 94 },
-      { name: 'Flex Fitness', amount: 151 },
-      { name: 'Sports Lab', amount: 30 },
-      { name: 'Training Peaks', amount: 33 },
+      { name: 'A.I.A (1)',           amount: 158, dueDate: '28', note: 'DD · 28th' },
+      { name: 'A.I.A (2)',           amount: 229, dueDate: '28', note: 'DD · 28th' },
+      { name: 'Snap Fitness (Jenny)',amount: 94,  dueDate: '17', note: 'DD · 17th' },
+      { name: 'Flex Fitness',        amount: 151, dueDate: 'weekly', note: 'DD · weekly' },
+      { name: 'Sports Lab',          amount: 30,  dueDate: '',   note: 'DD' },
+      { name: 'Training Peaks',      amount: 33,  dueDate: '29', note: 'DD · 29th' },
     ]},
     { category: 'Entertainment', amount: 58, items: [
-      { name: 'Spotify', amount: 19 },
-      { name: 'Netflix', amount: 34 },
-      { name: 'Apple.com', amount: 5 },
+      { name: 'Spotify',    amount: 19, dueDate: '15', note: 'DD · 15th' },
+      { name: 'Netflix',    amount: 34, dueDate: '30', note: 'DD · 30th' },
+      { name: 'Apple.com',  amount: 5,  dueDate: '19', note: 'DD · 19th' },
     ]},
     { category: 'Kids', amount: 340, items: [
-      { name: 'Remuera Annual Fees', amount: 54 },
-      { name: 'Clothes / Shoes', amount: 108 },
-      { name: 'School Holidays', amount: 100 },
-      { name: 'Swimming Lessons', amount: 77 },
+      { name: 'Remuera Annual Fees', amount: 54,  dueDate: '', note: 'Kiwibank hidden' },
+      { name: 'Clothes / Shoes',     amount: 108, dueDate: '', note: 'to arrange' },
+      { name: 'School Holidays',     amount: 100, dueDate: '', note: 'to arrange' },
+      { name: 'Swimming Lessons',    amount: 77,  dueDate: '', note: '' },
     ]},
     { category: 'Savings', amount: 1892, items: [
-      { name: 'Fiji Savings', amount: 333 },
-      { name: 'House Savings', amount: 1000 },
-      { name: 'Jenny', amount: 217 },
-      { name: 'Sean', amount: 217 },
-      { name: 'Car Maintenance', amount: 125 },
+      { name: 'Fiji Savings',    amount: 333,  dueDate: '',   note: 'ANZ' },
+      { name: 'House Savings',   amount: 1000, dueDate: '17', note: 'DD · 17th' },
+      { name: 'Jenny',           amount: 217,  dueDate: '',   note: '' },
+      { name: 'Sean',            amount: 217,  dueDate: '',   note: '' },
+      { name: 'Car Maintenance', amount: 125,  dueDate: '',   note: '' },
     ]},
     { category: 'Other', amount: 112, items: [
-      { name: 'Vero', amount: 88 },
-      { name: 'Canva', amount: 24 },
+      { name: 'Vero',  amount: 88, dueDate: '16', note: 'DD · 16th · insurance' },
+      { name: 'Canva', amount: 24, dueDate: '',   note: 'DD · monthly' },
     ]},
   ];
+
+  let _budgetView = 'monthly'; // 'monthly' or 'weekly'
 
   let _reportDate = new Date();
 
@@ -519,6 +521,23 @@ const App = (() => {
   }
 
   // ===== Budgets =====
+  function budgetWeekly(amount) { return amount / 4.333; }
+
+  function dueSoonItems() {
+    const today = new Date().getDate();
+    const upcoming = [];
+    budgets.forEach(b => {
+      (b.items || []).forEach(item => {
+        const d = parseInt(item.dueDate);
+        if (!isNaN(d)) {
+          const daysUntil = d >= today ? d - today : d + new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate() - today;
+          if (daysUntil <= 7) upcoming.push({ name: item.name, amount: item.amount, daysUntil, dueDate: item.dueDate });
+        }
+      });
+    });
+    return upcoming.sort((a, b) => a.daysUntil - b.daysUntil);
+  }
+
   function renderBudgets() {
     const container = document.getElementById('budgets-list');
 
@@ -529,31 +548,62 @@ const App = (() => {
 
     const filter = document.getElementById('budget-cat-filter')?.value || 'all';
     const filtered = filter === 'all' ? budgets : budgets.filter(b => b.category === filter);
-    const grandTotal = budgets.reduce((s, b) => s + b.amount, 0);
+    const grandMonthly = budgets.reduce((s, b) => s + b.amount, 0);
+    const isWeekly = _budgetView === 'weekly';
+    const grandDisplay = isWeekly ? budgetWeekly(grandMonthly) : grandMonthly;
+    const viewLabel = isWeekly ? '/wk' : '/mo';
+
+    // Upcoming bills banner
+    const upcoming = dueSoonItems();
+    const upcomingHtml = upcoming.length ? `
+      <div class="budget-upcoming">
+        <div class="budget-upcoming-title">⚠️ Due this week</div>
+        ${upcoming.map(u => `
+          <div class="budget-upcoming-item">
+            <span>${escHtml(u.name)}</span>
+            <span class="upcoming-due">${u.daysUntil === 0 ? 'today' : u.daysUntil === 1 ? 'tomorrow' : `in ${u.daysUntil} days`} · ${formatCurrency(u.amount)}</span>
+          </div>
+        `).join('')}
+      </div>` : '';
 
     container.innerHTML = `
+      ${upcomingHtml}
       <div class="budget-grand-total">
-        <span>Total Monthly Budget</span>
-        <strong>${formatCurrency(grandTotal)}</strong>
+        <span>Total <span class="view-label-text">${isWeekly ? 'Weekly' : 'Monthly'}</span> Budget</span>
+        <strong>${formatCurrency(grandDisplay)}<span class="per-month">${viewLabel}</span></strong>
       </div>
       ${filtered.map(b => {
         const items = b.items || [];
-        const itemsHtml = items.map(item => `
-          <div class="budget-line-item" data-item-id="${item.id}">
-            <span class="line-item-name">${escHtml(item.name)}</span>
-            <span class="line-item-amount">${formatCurrency(item.amount)}</span>
-            <button class="line-item-edit btn-ghost" data-budget-id="${b.id}" data-item-id="${item.id}" style="padding:3px 8px;font-size:12px;">Edit</button>
-            <button class="line-item-delete btn-ghost" data-budget-id="${b.id}" data-item-id="${item.id}" style="padding:3px 8px;font-size:12px;color:var(--red);">×</button>
-          </div>
-        `).join('');
+        const catDisplay = isWeekly ? budgetWeekly(b.amount) : b.amount;
+
+        const itemsHtml = items.map(item => {
+          const itemDisplay = isWeekly ? budgetWeekly(item.amount) : item.amount;
+          const dueBadge = item.dueDate && item.dueDate !== 'weekly'
+            ? `<span class="due-badge">📅 ${item.dueDate}${isNaN(item.dueDate) ? '' : 'th'}</span>` : '';
+          const weeklyBadge = item.dueDate === 'weekly' ? `<span class="due-badge">🔁 weekly</span>` : '';
+          const noteLine = item.note ? `<span class="line-item-note">${escHtml(item.note)}</span>` : '';
+          return `
+            <div class="budget-line-item">
+              <div class="line-item-left">
+                <span class="line-item-name">${escHtml(item.name)}</span>
+                ${noteLine}
+              </div>
+              <div class="line-item-right">
+                ${dueBadge}${weeklyBadge}
+                <span class="line-item-amount">${formatCurrency(itemDisplay)}<span class="per-month">${viewLabel}</span></span>
+                <button class="line-item-edit btn-ghost" data-budget-id="${b.id}" data-item-id="${item.id}">Edit</button>
+                <button class="line-item-delete btn-ghost" data-budget-id="${b.id}" data-item-id="${item.id}" style="color:var(--red);">×</button>
+              </div>
+            </div>`;
+        }).join('');
 
         return `<div class="budget-item">
           <div class="budget-header">
-            <button class="budget-toggle btn-ghost" data-budget-id="${b.id}" style="font-size:12px;padding:4px 8px;">▶</button>
+            <button class="budget-toggle btn-ghost" data-budget-id="${b.id}">▶</button>
             <div style="flex:1">
               <div class="budget-name">${categoryIcon(b.category)} ${escHtml(b.category)}</div>
             </div>
-            <div class="budget-category-total">${formatCurrency(b.amount)}<span class="per-month">/mo</span></div>
+            <div class="budget-category-total">${formatCurrency(catDisplay)}<span class="per-month">${viewLabel}</span></div>
             <div class="budget-actions">
               <button class="btn-ghost budget-edit" data-id="${b.id}" style="padding:5px 10px;font-size:12px;">Edit</button>
               <button class="btn-ghost budget-delete" data-id="${b.id}" style="padding:5px 10px;font-size:12px;color:var(--red);">Del</button>
@@ -649,6 +699,8 @@ const App = (() => {
     document.getElementById('form-budget')?.addEventListener('submit', saveBudget);
     document.getElementById('form-line-item')?.addEventListener('submit', saveLineItem);
     document.getElementById('budget-cat-filter')?.addEventListener('change', renderBudgets);
+    document.getElementById('budget-view-monthly')?.addEventListener('click', () => { _budgetView = 'monthly'; document.getElementById('budget-view-monthly').classList.add('active'); document.getElementById('budget-view-weekly').classList.remove('active'); renderBudgets(); });
+    document.getElementById('budget-view-weekly')?.addEventListener('click', () => { _budgetView = 'weekly'; document.getElementById('budget-view-weekly').classList.add('active'); document.getElementById('budget-view-monthly').classList.remove('active'); renderBudgets(); });
   }
 
   function openAddBudget() {
@@ -719,6 +771,8 @@ const App = (() => {
     document.getElementById('line-item-id').value = itemId;
     document.getElementById('line-item-name').value = item.name;
     document.getElementById('line-item-amount').value = item.amount;
+    document.getElementById('line-item-due').value = item.dueDate || '';
+    document.getElementById('line-item-note').value = item.note || '';
     document.getElementById('line-item-modal-title').textContent = 'Edit Item';
     document.getElementById('modal-line-item').classList.remove('hidden');
   }
@@ -729,6 +783,8 @@ const App = (() => {
     const itemId = document.getElementById('line-item-id').value;
     const name = document.getElementById('line-item-name').value.trim();
     const amount = parseFloat(document.getElementById('line-item-amount').value);
+    const dueDate = document.getElementById('line-item-due').value.trim();
+    const note = document.getElementById('line-item-note').value.trim();
 
     const budget = budgets.find(b => b.id === budgetId);
     if (!budget) return;
@@ -737,9 +793,9 @@ const App = (() => {
 
     if (itemId) {
       const idx = budget.items.findIndex(i => i.id === itemId);
-      if (idx >= 0) budget.items[idx] = { id: itemId, name, amount };
+      if (idx >= 0) budget.items[idx] = { id: itemId, name, amount, dueDate, note };
     } else {
-      budget.items.push({ id: crypto.randomUUID(), name, amount });
+      budget.items.push({ id: crypto.randomUUID(), name, amount, dueDate, note });
     }
 
     budget.amount = budget.items.reduce((s, i) => s + i.amount, 0);

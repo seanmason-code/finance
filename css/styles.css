@@ -418,15 +418,37 @@ body {
 
 .budget-filter-bar {
   margin-bottom: 16px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
 }
 .budget-filter-bar select {
-  width: 100%;
+  flex: 1;
   padding: 10px 14px;
   border-radius: var(--radius);
   border: 1px solid var(--border);
   background: var(--card);
   color: var(--text);
   font-size: 14px;
+}
+.budget-view-toggle {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.budget-view-toggle button {
+  padding: 8px 14px;
+  font-size: 13px;
+  border: none;
+  background: var(--card);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.budget-view-toggle button.active {
+  background: var(--accent);
+  color: #fff;
 }
 
 .budget-grand-total {
@@ -446,17 +468,36 @@ body {
   color: var(--text);
 }
 
+.budget-upcoming {
+  background: var(--card);
+  border: 1px solid var(--yellow);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  margin-bottom: 12px;
+}
+.budget-upcoming-title {
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 8px;
+  color: var(--yellow);
+}
+.budget-upcoming-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  padding: 3px 0;
+  color: var(--text);
+}
+.upcoming-due { color: var(--text-muted); font-size: 12px; }
+
 .budget-category-total {
   font-weight: 700;
   font-size: 16px;
   white-space: nowrap;
   margin-right: 8px;
 }
-.budget-category-total .per-month {
-  font-size: 11px;
-  font-weight: 400;
-  color: var(--text-muted);
-}
+.budget-category-total .per-month,
+.budget-grand-total .per-month { font-size: 11px; font-weight: 400; color: var(--text-muted); }
 
 .budget-items-list {
   border-top: 1px solid var(--border);
@@ -468,14 +509,40 @@ body {
 .budget-line-item {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
-  padding: 7px 0;
+  padding: 8px 0;
   border-bottom: 1px solid var(--border);
   font-size: 14px;
 }
 .budget-line-item:last-of-type { border-bottom: none; }
-.line-item-name { flex: 1; color: var(--text); }
-.line-item-amount { font-weight: 600; white-space: nowrap; min-width: 70px; text-align: right; }
+
+.line-item-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.line-item-name { font-size: 14px; color: var(--text); }
+.line-item-note { font-size: 11px; color: var(--text-muted); }
+
+.line-item-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.line-item-amount { font-weight: 600; white-space: nowrap; font-size: 14px; }
+.line-item-amount .per-month { font-size: 10px; font-weight: 400; color: var(--text-muted); }
+
+.due-badge {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.hint-inline { font-size: 11px; color: var(--text-muted); font-weight: 400; }
 
 /* ===== AI Chat ===== */
 #ai-chat {
