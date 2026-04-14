@@ -7,8 +7,7 @@ const App = (() => {
   let chatHistory = [];
   let editingTxnId = null;
   let _importRows = [];
-  let _rawCSVText = null;
-  let _importFilename = '';
+  let _csvFiles = []; // [{text, filename}]
 
   // ===== Boot: setup → login → app =====
   async function boot() {
@@ -905,18 +904,17 @@ const App = (() => {
     });
 
     document.getElementById('csv-file-input')?.addEventListener('change', async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      _rawCSVText = await file.text();
-      _importFilename = file.name;
+      const files = Array.from(e.target.files);
+      if (!files.length) return;
+      _csvFiles = await Promise.all(files.map(async f => ({ text: await f.text(), filename: f.name })));
       openImportModal();
       e.target.value = '';
     });
 
     document.getElementById('import-skip-internal')?.addEventListener('change', () => {
-      if (!_rawCSVText) return;
-      const rawRows = CSVImport.parseCSV(_rawCSVText);
-      _importRows = CSVImport.processRows(rawRows, document.getElementById('import-skip-internal').checked, _importFilename);
+      if (!_csvFiles.length) return;
+      const skip = document.getElementById('import-skip-internal').checked;
+      _importRows = _csvFiles.flatMap(f => CSVImport.processRows(CSVImport.parseCSV(f.text), skip, f.filename));
       renderImportTable();
     });
 
@@ -929,9 +927,8 @@ const App = (() => {
   }
 
   function openImportModal() {
-    const rawRows = CSVImport.parseCSV(_rawCSVText);
     const skipInternal = document.getElementById('import-skip-internal').checked;
-    _importRows = CSVImport.processRows(rawRows, skipInternal, _importFilename);
+    _importRows = _csvFiles.flatMap(f => CSVImport.processRows(CSVImport.parseCSV(f.text), skipInternal, f.filename));
     renderImportTable();
     document.getElementById('modal-import').classList.remove('hidden');
   }
@@ -1016,7 +1013,7 @@ const App = (() => {
     refreshCurrentPage();
     showToast(`Imported ${count} transaction${count !== 1 ? 's' : ''}`);
     _importRows = [];
-    _rawCSVText = null;
+    _csvFiles = [];
   }
 
   // ===== Helpers =====
