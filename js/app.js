@@ -695,20 +695,25 @@ const App = (() => {
   }
 
   async function loadPresetBudgets() {
-    if (!confirm('This will load all preset budgets and line items, updating any existing ones. Continue?')) return;
+    if (!confirm('This will delete all existing budgets and reload the defaults. Continue?')) return;
+
+    // Delete ALL existing budgets first to clear duplicates
+    for (const b of [...budgets]) {
+      try { await SB.deleteBudget(b.id); } catch {}
+    }
+    budgets = [];
+
     let count = 0;
     for (const preset of PRESET_BUDGETS) {
-      const existing = budgets.find(b => b.category === preset.category);
       const b = {
-        id: existing?.id || crypto.randomUUID(),
+        id: crypto.randomUUID(),
         category: preset.category,
         amount: preset.amount,
-        items: (preset.items || []).map(item => ({ id: crypto.randomUUID(), name: item.name, amount: item.amount })),
+        items: (preset.items || []).map(item => ({ id: crypto.randomUUID(), name: item.name, amount: item.amount, dueDate: item.dueDate || '', note: item.note || '' })),
       };
       try {
         await SB.upsertBudget(b);
       } catch (err) {
-        // items column may not exist yet — save without items as fallback
         await SB.upsertBudget({ id: b.id, category: b.category, amount: b.amount });
         b.items = [];
       }
