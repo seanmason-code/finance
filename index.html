@@ -78,6 +78,10 @@
           <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
           Dashboard
         </a></li>
+        <li><a href="#" data-page="accounts">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+          Accounts
+        </a></li>
         <li><a href="#" data-page="transactions">
           <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
           Transactions
@@ -174,6 +178,16 @@
             <p class="placeholder-text">Add some transactions to get your AI financial snapshot.</p>
           </div>
         </div>
+      </div>
+
+      <!-- Accounts Page -->
+      <div id="page-accounts" class="page">
+        <header class="page-header">
+          <h1>Accounts</h1>
+          <button id="btn-add-account" class="btn-primary">+ Add Account</button>
+        </header>
+        <div id="accounts-total-card"></div>
+        <div id="accounts-list"></div>
       </div>
 
       <!-- Transactions Page -->
@@ -612,6 +626,52 @@
         <button type="button" class="btn-ghost modal-close-btn">Cancel</button>
         <button type="button" id="import-confirm-btn" class="btn-primary">Import</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Account Modal -->
+  <div id="modal-account" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2 id="modal-account-title">Add Account</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <form id="form-account">
+        <input type="hidden" id="account-id" value="" />
+        <label>Account Name</label>
+        <input type="text" id="account-name" placeholder="e.g. ANZ Everyday" required />
+        <label>Bank</label>
+        <select id="account-bank">
+          <option value="ANZ">ANZ</option>
+          <option value="Kiwibank">Kiwibank</option>
+          <option value="Westpac">Westpac</option>
+          <option value="BNZ">BNZ</option>
+          <option value="ASB">ASB</option>
+          <option value="Other">Other</option>
+        </select>
+        <label>Owner</label>
+        <select id="account-owner">
+          <option value="Joint">Joint</option>
+          <option value="Sean">Sean</option>
+          <option value="Partner">Partner</option>
+        </select>
+        <label>Account Number <span class="hint-inline">(used to match CSV imports)</span></label>
+        <input type="text" id="account-number" placeholder="e.g. 01-0902-1234567-00" />
+        <label>Current Balance</label>
+        <div class="amount-input">
+          <span class="currency-symbol">$</span>
+          <input type="number" id="account-balance" placeholder="0.00" step="0.01" required />
+        </div>
+        <label>Colour</label>
+        <div id="account-color-picker" class="color-picker-row"></div>
+        <input type="hidden" id="account-color" value="#6c63ff" />
+        <div class="modal-actions">
+          <button type="button" id="btn-delete-account" class="btn-danger" style="margin-right:auto;display:none">Delete</button>
+          <button type="button" class="btn-ghost modal-close-btn">Cancel</button>
+          <button type="submit" class="btn-primary">Save Account</button>
+        </div>
+      </form>
     </div>
   </div>
 

@@ -3,6 +3,7 @@ const App = (() => {
   let transactions = [];
   let budgets = [];
   let recurring = [];
+  let accounts = [];
   let currency = 'NZD';
   let chatHistory = [];
   let editingTxnId = null;
@@ -124,11 +125,13 @@ const App = (() => {
       transactions = await SB.getTransactions();
       budgets = await SB.getBudgets();
       recurring = await SB.getRecurring();
+      accounts = await SB.getAccounts().catch(() => []);
     } catch (err) {
       console.error('Failed to load data:', err);
       transactions = [];
       budgets = [];
       recurring = [];
+      accounts = [];
     }
 
     // Auto-seed budgets on first use if none exist
@@ -150,6 +153,7 @@ const App = (() => {
     bindTransactionModal();
     bindBudgetModal();
     bindRecurringModal();
+    bindAccountModal();
     bindAI();
     bindSettings();
     bindFilters();
@@ -210,6 +214,7 @@ const App = (() => {
     localStorage.setItem('lastPage', page);
 
     if (page === 'dashboard') renderDashboard();
+    if (page === 'accounts') renderAccounts();
     if (page === 'transactions') renderTransactionsList();
     if (page === 'budgets') renderBudgets();
     if (page === 'recurring') renderRecurring();
@@ -291,6 +296,180 @@ const App = (() => {
 
     container.innerHTML = recent.map(t => transactionHTML(t)).join('');
     bindTransactionActions(container);
+  }
+
+  // ===== Accounts Page =====
+  const ACCOUNT_COLORS = ['#6c63ff','#22c55e','#3b82f6','#f59e0b','#ef4444','#ec4899','#14b8a6','#8b5cf6'];
+  const BANK_ICONS = { ANZ: '🏦', Kiwibank: '🥝', Westpac: '🔴', BNZ: '🟠', ASB: '🏧', Other: '💳' };
+
+  function renderAccounts() {
+    const totalEl = document.getElementById('accounts-total-card');
+    const listEl = document.getElementById('accounts-list');
+    if (!totalEl || !listEl) return;
+
+    const now = new Date();
+    const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+    const totalBalance = accounts.reduce((s, a) => s + (a.balance || 0), 0);
+    const monthIncome = transactions.filter(t => t.type === 'income' && t.category !== 'Transfer' && t.date.startsWith(thisMonth)).reduce((s, t) => s + t.amount, 0);
+    const monthExpense = transactions.filter(t => t.type === 'expense' && t.category !== 'Transfer' && t.date.startsWith(thisMonth)).reduce((s, t) => s + t.amount, 0);
+
+    totalEl.innerHTML = `
+      <div class="accounts-total">
+        <div>
+          <div class="accounts-total-label">Total Balance</div>
+          <div class="accounts-total-amount">${formatCurrency(totalBalance)}</div>
+          <div class="accounts-total-sub">Across ${accounts.length} account${accounts.length !== 1 ? 's' : ''}</div>
+        </div>
+        <div class="accounts-total-right">
+          <div class="accounts-total-stat">
+            <div class="val" style="color:var(--green)">${formatCurrency(monthIncome)}</div>
+            <div class="lbl">In this month</div>
+          </div>
+          <div class="accounts-total-stat">
+            <div class="val" style="color:var(--red)">${formatCurrency(monthExpense)}</div>
+            <div class="lbl">Out this month</div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    if (accounts.length === 0) {
+      listEl.innerHTML = `
+        <div class="accounts-empty">
+          <p>No accounts yet. Add your first account to track balances.</p>
+          <button class="btn-primary" id="btn-accounts-add-first">+ Add Account</button>
+        </div>`;
+      document.getElementById('btn-accounts-add-first')?.addEventListener('click', () => openAddAccount());
+      return;
+    }
+
+    listEl.innerHTML = `<div class="accounts-grid">${accounts.map(a => accountCardHTML(a, thisMonth)).join('')}</div>`;
+    listEl.querySelectorAll('.account-card').forEach(card => {
+      card.addEventListener('click', () => openEditAccount(card.dataset.id));
+    });
+  }
+
+  function accountCardHTML(a, thisMonth) {
+    const color = a.color || '#6c63ff';
+    const icon = BANK_ICONS[a.bank] || '💳';
+    const txns = transactions.filter(t => t.account && t.account === a.account_number && t.date.startsWith(thisMonth));
+    const monthIn = txns.filter(t => t.type === 'income' && t.category !== 'Transfer').reduce((s, t) => s + t.amount, 0);
+    const monthOut = txns.filter(t => t.type === 'expense' && t.category !== 'Transfer').reduce((s, t) => s + t.amount, 0);
+
+    const updatedAt = a.balance_updated_at
+      ? (() => { const d = new Date(a.balance_updated_at); const diff = Math.round((Date.now() - d) / 86400000); return diff === 0 ? 'Updated today' : diff === 1 ? 'Updated yesterday' : `Updated ${diff} days ago`; })()
+      : 'Balance not set';
+
+    return `
+      <div class="account-card" data-id="${a.id}">
+        <div class="account-card-top">
+          <div class="account-bank-icon" style="background:${color}22;color:${color};font-size:22px">${icon}</div>
+          <div class="account-card-info">
+            <div class="account-card-name">${escHtml(a.name)}</div>
+            <div class="account-card-meta">${escHtml(a.bank)} · ${escHtml(a.owner || 'Joint')}</div>
+          </div>
+        </div>
+        <div class="account-card-balance">
+          <div class="account-card-balance-amount" style="color:${color}">${formatCurrency(a.balance || 0)}</div>
+          <div class="account-card-balance-updated">${updatedAt}</div>
+        </div>
+        <div class="account-card-stats">
+          <div>
+            <div class="account-stat-label">In this month</div>
+            <div class="account-stat-value income">${monthIn > 0 ? '+' + formatCurrency(monthIn) : '—'}</div>
+          </div>
+          <div>
+            <div class="account-stat-label">Out this month</div>
+            <div class="account-stat-value expense">${monthOut > 0 ? formatCurrency(monthOut) : '—'}</div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function openAddAccount() {
+    document.getElementById('modal-account-title').textContent = 'Add Account';
+    document.getElementById('form-account').reset();
+    document.getElementById('account-id').value = '';
+    document.getElementById('account-color').value = '#6c63ff';
+    document.getElementById('btn-delete-account').style.display = 'none';
+    renderColorPicker('#6c63ff');
+    document.getElementById('modal-account').classList.remove('hidden');
+  }
+
+  function openEditAccount(id) {
+    const a = accounts.find(x => x.id === id);
+    if (!a) return;
+    document.getElementById('modal-account-title').textContent = 'Edit Account';
+    document.getElementById('account-id').value = a.id;
+    document.getElementById('account-name').value = a.name;
+    document.getElementById('account-bank').value = a.bank || 'ANZ';
+    document.getElementById('account-owner').value = a.owner || 'Joint';
+    document.getElementById('account-number').value = a.account_number || '';
+    document.getElementById('account-balance').value = a.balance || 0;
+    document.getElementById('account-color').value = a.color || '#6c63ff';
+    document.getElementById('btn-delete-account').style.display = 'inline-flex';
+    renderColorPicker(a.color || '#6c63ff');
+    document.getElementById('modal-account').classList.remove('hidden');
+  }
+
+  function renderColorPicker(selected) {
+    const row = document.getElementById('account-color-picker');
+    row.innerHTML = ACCOUNT_COLORS.map(c =>
+      `<div class="color-swatch${c === selected ? ' selected' : ''}" style="background:${c}" data-color="${c}"></div>`
+    ).join('');
+    row.querySelectorAll('.color-swatch').forEach(sw => {
+      sw.addEventListener('click', () => {
+        row.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+        sw.classList.add('selected');
+        document.getElementById('account-color').value = sw.dataset.color;
+      });
+    });
+  }
+
+  function bindAccountModal() {
+    document.getElementById('btn-add-account')?.addEventListener('click', openAddAccount);
+
+    document.getElementById('form-account')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = document.getElementById('account-id').value || crypto.randomUUID();
+      const session = await SB.getSession();
+      const a = {
+        id,
+        user_id: session.user.id,
+        name: document.getElementById('account-name').value.trim(),
+        bank: document.getElementById('account-bank').value,
+        owner: document.getElementById('account-owner').value,
+        account_number: document.getElementById('account-number').value.trim(),
+        balance: parseFloat(document.getElementById('account-balance').value) || 0,
+        balance_updated_at: new Date().toISOString().slice(0, 10),
+        color: document.getElementById('account-color').value,
+      };
+      try {
+        await SB.upsertAccount(a);
+        const idx = accounts.findIndex(x => x.id === id);
+        if (idx >= 0) accounts[idx] = a; else accounts.push(a);
+        closeModals();
+        renderAccounts();
+        showToast('Account saved');
+      } catch (err) {
+        alert('Failed to save account: ' + err.message);
+      }
+    });
+
+    document.getElementById('btn-delete-account')?.addEventListener('click', async () => {
+      const id = document.getElementById('account-id').value;
+      if (!id || !confirm('Delete this account? Your transactions will not be affected.')) return;
+      try {
+        await SB.deleteAccount(id);
+        accounts = accounts.filter(a => a.id !== id);
+        closeModals();
+        renderAccounts();
+        showToast('Account deleted');
+      } catch (err) {
+        alert('Failed to delete: ' + err.message);
+      }
+    });
   }
 
   // ===== Transactions Page =====
@@ -1618,7 +1797,8 @@ const App = (() => {
         amount: row.amount,
         type: row.type,
         category: row.category,
-        notes: `Bank import (${row.account})`,
+        account: row.account || '',
+        notes: '',
       };
       try {
         await SB.upsertTransaction(t);
@@ -1659,6 +1839,7 @@ const App = (() => {
     if (!active) return;
     const page = active.id.replace('page-', '');
     if (page === 'dashboard') renderDashboard();
+    else if (page === 'accounts') renderAccounts();
     else if (page === 'transactions') renderTransactionsList();
     else if (page === 'budgets') renderBudgets();
   }

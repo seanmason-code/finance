@@ -87,11 +87,29 @@ const SB = (() => {
     if (error) throw error;
   }
 
+  // ===== Accounts =====
+  async function getAccounts() {
+    const { data, error } = await client.from('accounts').select('*').order('name');
+    if (error) throw error;
+    return data;
+  }
+
+  async function upsertAccount(a) {
+    const { error } = await client.from('accounts').upsert(a);
+    if (error) throw error;
+  }
+
+  async function deleteAccount(id) {
+    const { error } = await client.from('accounts').delete().eq('id', id);
+    if (error) throw error;
+  }
+
   return {
     init, get,
     signIn, signUp, signOut, getSession,
     getTransactions, upsertTransaction, deleteTransaction,
     getBudgets, upsertBudget, deleteBudget,
     getRecurring, upsertRecurring, deleteRecurring,
+    getAccounts, upsertAccount, deleteAccount,
   };
 })();
