@@ -547,10 +547,10 @@ const App = (() => {
 
       // If editing category, offer to apply to all matching descriptions
       if (isEdit) {
-        const original = transactions.find(x => x.id === id);
+        const norm = s => (s || '').replace(/\s+/g, ' ').trim().toLowerCase();
         const matches = transactions.filter(x =>
           x.id !== id &&
-          x.description.trim().toLowerCase() === t.description.toLowerCase() &&
+          norm(x.description) === norm(t.description) &&
           x.category !== t.category
         );
         if (matches.length > 0) {
