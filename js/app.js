@@ -1033,6 +1033,7 @@ const App = (() => {
     btn.disabled = true;
 
     let count = 0;
+    const total = toImport.length;
     for (const row of toImport) {
       const t = {
         id: crypto.randomUUID(),
@@ -1050,6 +1051,7 @@ const App = (() => {
       } catch (err) {
         console.error('Import row failed:', err);
       }
+      btn.textContent = `Importing... ${Math.round((count / total) * 100)}%`;
     }
 
     btn.disabled = false;
