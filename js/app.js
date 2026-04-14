@@ -564,7 +564,11 @@ const App = (() => {
         );
 
         if (exact.length > 0 || partial.length > 0) {
+          closeModals();
+          refreshCurrentPage();
+          clearAISnapshot();
           openBulkCategoryModal(t.category, exact, partial);
+          return;
         }
       }
 
