@@ -178,8 +178,12 @@
       <div id="page-transactions" class="page">
         <header class="page-header">
           <h1>Transactions</h1>
-          <button class="btn-primary open-add-transaction">+ Add Transaction</button>
+          <div class="header-btn-group">
+            <button id="btn-import-csv" class="btn-ghost">&#8593; Import CSV</button>
+            <button class="btn-primary open-add-transaction">+ Add Transaction</button>
+          </div>
         </header>
+        <input type="file" id="csv-file-input" accept=".csv" hidden />
         <div class="filters-bar">
           <select id="filter-month">
             <option value="">All Time</option>
@@ -447,10 +451,45 @@
     </div>
   </div>
 
+  <!-- Import CSV Modal -->
+  <div id="modal-import" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-box modal-box-wide">
+      <div class="modal-header">
+        <h2>Import Kiwibank CSV</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <label class="import-skip-label">
+        <input type="checkbox" id="import-skip-internal" checked />
+        Skip internal transfers (between your own accounts)
+      </label>
+      <div id="import-summary" class="import-summary"></div>
+      <div class="import-table-wrap">
+        <table class="import-table">
+          <thead>
+            <tr>
+              <th><input type="checkbox" id="import-select-all" checked title="Select all" /></th>
+              <th>Date</th>
+              <th>Description</th>
+              <th>Amount</th>
+              <th>Category</th>
+            </tr>
+          </thead>
+          <tbody id="import-tbody"></tbody>
+        </table>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-ghost modal-close-btn">Cancel</button>
+        <button type="button" id="import-confirm-btn" class="btn-primary">Import</button>
+      </div>
+    </div>
+  </div>
+
   <script src="js/db.js"></script>
   <script src="js/supabase-client.js"></script>
   <script src="js/charts.js"></script>
   <script src="js/ai.js"></script>
+  <script src="js/csv-import.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

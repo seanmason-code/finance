@@ -6,6 +6,8 @@ const App = (() => {
   let currency = 'NZD';
   let chatHistory = [];
   let editingTxnId = null;
+  let _importRows = [];
+  let _rawCSVText = null;
 
   // ===== Boot: setup → login → app =====
   async function boot() {
@@ -136,6 +138,7 @@ const App = (() => {
     bindSettings();
     bindFilters();
     bindExportImport();
+    bindCSVImport();
     bindSignOut();
     bindMobileMenu();
 
@@ -892,6 +895,126 @@ const App = (() => {
     chatHistory = [];
     refreshCurrentPage();
     showToast('All data cleared');
+  }
+
+  // ===== CSV Import =====
+  function bindCSVImport() {
+    document.getElementById('btn-import-csv')?.addEventListener('click', () => {
+      document.getElementById('csv-file-input').click();
+    });
+
+    document.getElementById('csv-file-input')?.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      _rawCSVText = await file.text();
+      openImportModal();
+      e.target.value = '';
+    });
+
+    document.getElementById('import-skip-internal')?.addEventListener('change', () => {
+      if (!_rawCSVText) return;
+      const rawRows = CSVImport.parseCSV(_rawCSVText);
+      _importRows = CSVImport.processRows(rawRows, document.getElementById('import-skip-internal').checked);
+      renderImportTable();
+    });
+
+    document.getElementById('import-select-all')?.addEventListener('change', (e) => {
+      document.querySelectorAll('.import-row-check').forEach(cb => { cb.checked = e.target.checked; });
+      updateImportSummary();
+    });
+
+    document.getElementById('import-confirm-btn')?.addEventListener('click', doImport);
+  }
+
+  function openImportModal() {
+    const rawRows = CSVImport.parseCSV(_rawCSVText);
+    const skipInternal = document.getElementById('import-skip-internal').checked;
+    _importRows = CSVImport.processRows(rawRows, skipInternal);
+    renderImportTable();
+    document.getElementById('modal-import').classList.remove('hidden');
+  }
+
+  function renderImportTable() {
+    const tbody = document.getElementById('import-tbody');
+    tbody.innerHTML = _importRows.map((row, i) => {
+      const isDuplicate = transactions.some(t =>
+        t.date === row.date &&
+        Math.abs(t.amount - row.amount) < 0.01 &&
+        t.description === row.description
+      );
+      const rowClass = isDuplicate ? 'duplicate' : '';
+      const checked = isDuplicate ? '' : ' checked';
+      const dupBadge = isDuplicate ? '<span class="dup-badge">exists</span>' : '';
+      return `<tr class="${rowClass}" data-idx="${i}">
+        <td><input type="checkbox" class="import-row-check" data-idx="${i}"${checked} /></td>
+        <td class="import-date">${row.date}</td>
+        <td class="import-desc">${escHtml(row.description)}${dupBadge}</td>
+        <td class="import-amount ${row.type}">${row.type === 'expense' ? '&minus;' : '+'}${formatCurrency(row.amount)}</td>
+        <td class="import-cat"><select class="import-cat-select" data-idx="${i}">${CSVImport.categoryOptionsHTML(row.category, row.type)}</select></td>
+      </tr>`;
+    }).join('');
+
+    tbody.querySelectorAll('.import-cat-select').forEach(sel => {
+      sel.addEventListener('change', (e) => {
+        _importRows[parseInt(e.target.dataset.idx)].category = e.target.value;
+      });
+    });
+    tbody.querySelectorAll('.import-row-check').forEach(cb => {
+      cb.addEventListener('change', updateImportSummary);
+    });
+
+    updateImportSummary();
+  }
+
+  function updateImportSummary() {
+    const total = _importRows.length;
+    const selected = document.querySelectorAll('.import-row-check:checked').length;
+    document.getElementById('import-summary').textContent =
+      `${total} transactions found · ${selected} selected`;
+    document.getElementById('import-confirm-btn').textContent =
+      `Import ${selected} transaction${selected !== 1 ? 's' : ''}`;
+  }
+
+  async function doImport() {
+    const checked = [...document.querySelectorAll('.import-row-check:checked')]
+      .map(cb => parseInt(cb.dataset.idx));
+
+    if (checked.length === 0) {
+      alert('No transactions selected.');
+      return;
+    }
+
+    const btn = document.getElementById('import-confirm-btn');
+    btn.textContent = 'Importing...';
+    btn.disabled = true;
+
+    let count = 0;
+    for (const idx of checked) {
+      const row = _importRows[idx];
+      const t = {
+        id: crypto.randomUUID(),
+        date: row.date,
+        description: row.description,
+        amount: row.amount,
+        type: row.type,
+        category: row.category,
+        notes: `Kiwibank import (${row.account})`,
+      };
+      try {
+        await SB.upsertTransaction(t);
+        transactions.push(t);
+        count++;
+      } catch (err) {
+        console.error('Import row failed:', err);
+      }
+    }
+
+    btn.disabled = false;
+    closeModals();
+    refreshCurrentPage();
+    showToast(`Imported ${count} transaction${count !== 1 ? 's' : ''}`);
+    _importRows = [];
+    _rawCSVText = null;
   }
 
   // ===== Helpers =====

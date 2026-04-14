@@ -990,3 +990,106 @@ body {
 
   #sidebar.open { left: 0; }
 }
+
+/* ===== Header button group ===== */
+.header-btn-group {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* ===== Import CSV Modal ===== */
+.modal-box-wide {
+  width: 720px;
+  max-width: 96vw;
+}
+
+.import-skip-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 14px;
+  cursor: pointer;
+}
+
+.import-skip-label input { cursor: pointer; }
+
+.import-summary {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+  min-height: 18px;
+}
+
+.import-table-wrap {
+  max-height: 420px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 16px;
+}
+
+.import-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.import-table thead {
+  position: sticky;
+  top: 0;
+  background: var(--bg-2);
+  z-index: 1;
+}
+
+.import-table th {
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 11px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.import-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  vertical-align: middle;
+}
+
+.import-table tr:last-child td { border-bottom: none; }
+
+.import-table tr.duplicate td { opacity: 0.45; }
+
+.import-date { white-space: nowrap; color: var(--text-muted); font-size: 12px; }
+
+.import-desc { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.import-amount { white-space: nowrap; font-weight: 600; }
+.import-amount.income { color: var(--green); }
+.import-amount.expense { color: var(--red); }
+
+.import-cat select {
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 4px 6px;
+  font-size: 12px;
+  cursor: pointer;
+  max-width: 140px;
+}
+
+.dup-badge {
+  display: inline-block;
+  font-size: 10px;
+  background: rgba(239,68,68,0.15);
+  color: var(--red);
+  padding: 1px 5px;
+  border-radius: 4px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
