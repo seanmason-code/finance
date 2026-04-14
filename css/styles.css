@@ -194,10 +194,62 @@ body {
 
 .btn-danger:hover { background: rgba(239,68,68,0.25); }
 
+/* ===== Pace Card ===== */
+#pace-card { margin-bottom: 20px; }
+
+.pace-card {
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  border: 1px solid var(--border);
+}
+.pace-card.ahead {
+  background: rgba(34,197,94,0.08);
+  border-color: var(--green);
+}
+.pace-card.behind {
+  background: rgba(239,68,68,0.08);
+  border-color: var(--red);
+}
+.pace-status {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+  color: var(--text-muted);
+}
+.pace-card.ahead .pace-status { color: var(--green); }
+.pace-card.behind .pace-status { color: var(--red); }
+
+.pace-amount {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.pace-detail {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.pace-drill {
+  display: block;
+  margin-top: 14px;
+  background: none;
+  border: 1px solid var(--red);
+  color: var(--red);
+  border-radius: var(--radius);
+  padding: 8px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  width: 100%;
+  text-align: center;
+}
+.pace-drill:hover { background: rgba(239,68,68,0.1); }
+
 /* ===== Stats Grid ===== */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 16px;
   margin-bottom: 24px;
 }

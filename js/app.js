@@ -226,9 +226,6 @@ const App = (() => {
     const expenses = monthTxns.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
     const net = income - expenses;
 
-    const totalBudget = budgets.reduce((s, b) => s + b.amount, 0);
-    const budgetRemaining = totalBudget - expenses;
-
     const weeklyIncome = income * 12 / 52;
     const weeklyExpenses = expenses * 12 / 52;
 
@@ -240,13 +237,42 @@ const App = (() => {
     const netWk = document.getElementById('stat-net-weekly');
     if (incWk) incWk.textContent = `${formatCurrency(weeklyIncome)}/wk`;
     if (expWk) expWk.textContent = `${formatCurrency(weeklyExpenses)}/wk`;
-    if (netWk) netWk.textContent = `${formatCurrency((net) * 12 / 52)}/wk`;
-    document.getElementById('stat-budget-remaining').textContent =
-      totalBudget > 0 ? formatCurrency(budgetRemaining) : '—';
+    if (netWk) netWk.textContent = `${formatCurrency(net * 12 / 52)}/wk`;
 
+    renderPaceCard(expenses);
     Charts.renderCategoryChart(monthTxns);
     Charts.renderTimelineChart(transactions);
     renderRecentTransactions();
+  }
+
+  function renderPaceCard(expenses) {
+    const card = document.getElementById('pace-card');
+    if (!card) return;
+
+    const now = new Date();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const dayOfMonth = now.getDate();
+    const totalBudget = budgets.reduce((s, b) => s + b.amount, 0);
+
+    if (totalBudget === 0) { card.innerHTML = ''; return; }
+
+    const expected = (dayOfMonth / daysInMonth) * totalBudget;
+    const diff = expected - expenses;
+    const ahead = diff >= 0;
+    const monthName = now.toLocaleDateString('en', { month: 'long' });
+
+    card.innerHTML = `
+      <div class="pace-card ${ahead ? 'ahead' : 'behind'}">
+        <div class="pace-status">${ahead ? '✅' : '⚠️'} ${ahead ? 'AHEAD' : 'BEHIND'}</div>
+        <div class="pace-amount">${formatCurrency(Math.abs(diff))} ${ahead ? 'under' : 'over'} pace</div>
+        <div class="pace-detail">Spent ${formatCurrency(expenses)} of ${formatCurrency(expected)} expected in ${monthName}</div>
+        ${!ahead ? `<button class="pace-drill" id="btn-pace-drill">→ See what's over budget</button>` : ''}
+      </div>
+    `;
+
+    if (!ahead) {
+      document.getElementById('btn-pace-drill')?.addEventListener('click', () => navigateTo('reports'));
+    }
   }
 
   function renderRecentTransactions() {
