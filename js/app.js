@@ -346,16 +346,54 @@ const App = (() => {
   }
 
   const PRESET_BUDGETS = [
-    { category: 'Housing',      amount: 8621 },
-    { category: 'Food & Dining', amount: 1625 },
-    { category: 'Transport',    amount: 996  },
-    { category: 'Utilities',    amount: 697  },
-    { category: 'Health',       amount: 350  },
-    { category: 'Entertainment', amount: 91  },
-    { category: 'Kids',         amount: 2007 },
-    { category: 'Shopping',     amount: 400  },
-    { category: 'Personal Care', amount: 150 },
-    { category: 'Other',        amount: 300  },
+    { category: 'Housing', amount: 1949, items: [
+      { name: 'Apples', amount: 1105 },
+      { name: 'Skids', amount: 563 },
+      { name: 'Tower Units', amount: 166 },
+      { name: 'Tower Home', amount: 115 },
+    ]},
+    { category: 'Food & Dining', amount: 1625, items: [
+      { name: 'Food', amount: 1625 },
+    ]},
+    { category: 'Transport', amount: 996, items: [
+      { name: 'Fuel', amount: 563 },
+      { name: 'Parking', amount: 433 },
+    ]},
+    { category: 'Utilities', amount: 697, items: [
+      { name: 'Meridian', amount: 200 },
+      { name: 'Watercare', amount: 380 },
+      { name: 'Spark', amount: 117 },
+    ]},
+    { category: 'Health', amount: 695, items: [
+      { name: 'A.I.A (1)', amount: 158 },
+      { name: 'A.I.A (2)', amount: 229 },
+      { name: 'Snap Fitness (Jenny)', amount: 94 },
+      { name: 'Flex Fitness', amount: 151 },
+      { name: 'Sports Lab', amount: 30 },
+      { name: 'Training Peaks', amount: 33 },
+    ]},
+    { category: 'Entertainment', amount: 58, items: [
+      { name: 'Spotify', amount: 19 },
+      { name: 'Netflix', amount: 34 },
+      { name: 'Apple.com', amount: 5 },
+    ]},
+    { category: 'Kids', amount: 340, items: [
+      { name: 'Remuera Annual Fees', amount: 54 },
+      { name: 'Clothes / Shoes', amount: 108 },
+      { name: 'School Holidays', amount: 100 },
+      { name: 'Swimming Lessons', amount: 77 },
+    ]},
+    { category: 'Savings', amount: 1892, items: [
+      { name: 'Fiji Savings', amount: 333 },
+      { name: 'House Savings', amount: 1000 },
+      { name: 'Jenny', amount: 217 },
+      { name: 'Sean', amount: 217 },
+      { name: 'Car Maintenance', amount: 125 },
+    ]},
+    { category: 'Other', amount: 112, items: [
+      { name: 'Vero', amount: 88 },
+      { name: 'Canva', amount: 24 },
+    ]},
   ];
 
   let _reportDate = new Date();
@@ -364,7 +402,8 @@ const App = (() => {
     const icons = {
       'Housing': '🏠', 'Food & Dining': '🍽️', 'Transport': '🚗', 'Health': '💊',
       'Entertainment': '🎬', 'Shopping': '🛍️', 'Utilities': '💡', 'Kids': '👶',
-      'Education': '📚', 'Personal Care': '💇', 'Salary': '💼', 'Freelance': '💻',
+      'Education': '📚', 'Personal Care': '💇', 'Savings': '🏦',
+      'Salary': '💼', 'Freelance': '💻',
       'Investment': '📈', 'Gift': '🎁', 'Other Income': '💰', 'Other': '📌'
     };
     return icons[category] || '💳';
@@ -466,52 +505,73 @@ const App = (() => {
   // ===== Budgets =====
   function renderBudgets() {
     const container = document.getElementById('budgets-list');
-    const now = new Date();
-    const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const monthExpenses = transactions.filter(t => t.type === 'expense' && t.date.startsWith(thisMonth));
-
-    const byCategory = {};
-    monthExpenses.forEach(t => {
-      byCategory[t.category] = (byCategory[t.category] || 0) + t.amount;
-    });
 
     if (budgets.length === 0) {
       container.innerHTML = '<div class="empty-state"><p>No budgets set. Add one to start tracking your spending limits.</p></div>';
       return;
     }
 
-    container.innerHTML = budgets.map(b => {
-      const spent = byCategory[b.category] || 0;
-      const pct = Math.min((spent / b.amount) * 100, 100);
-      const status = pct >= 100 ? 'over' : pct >= 80 ? 'warning' : 'safe';
-      const statusText = pct >= 100
-        ? `<span style="color:var(--red)">Over by ${formatCurrency(spent - b.amount)}</span>`
-        : `<span style="color:var(--text-muted)">${formatCurrency(b.amount - spent)} left</span>`;
+    const filter = document.getElementById('budget-cat-filter')?.value || 'all';
+    const filtered = filter === 'all' ? budgets : budgets.filter(b => b.category === filter);
+    const grandTotal = budgets.reduce((s, b) => s + b.amount, 0);
 
-      return `<div class="budget-item">
-        <div class="budget-header">
-          <div>
-            <div class="budget-name">${categoryIcon(b.category)} ${escHtml(b.category)}</div>
-            <div class="budget-amounts">
-              <strong>${formatCurrency(spent)}</strong> of ${formatCurrency(b.amount)} · ${statusText}
+    container.innerHTML = `
+      <div class="budget-grand-total">
+        <span>Total Monthly Budget</span>
+        <strong>${formatCurrency(grandTotal)}</strong>
+      </div>
+      ${filtered.map(b => {
+        const items = b.items || [];
+        const itemsHtml = items.map(item => `
+          <div class="budget-line-item" data-item-id="${item.id}">
+            <span class="line-item-name">${escHtml(item.name)}</span>
+            <span class="line-item-amount">${formatCurrency(item.amount)}</span>
+            <button class="line-item-edit btn-ghost" data-budget-id="${b.id}" data-item-id="${item.id}" style="padding:3px 8px;font-size:12px;">Edit</button>
+            <button class="line-item-delete btn-ghost" data-budget-id="${b.id}" data-item-id="${item.id}" style="padding:3px 8px;font-size:12px;color:var(--red);">×</button>
+          </div>
+        `).join('');
+
+        return `<div class="budget-item">
+          <div class="budget-header">
+            <button class="budget-toggle btn-ghost" data-budget-id="${b.id}" style="font-size:12px;padding:4px 8px;">▶</button>
+            <div style="flex:1">
+              <div class="budget-name">${categoryIcon(b.category)} ${escHtml(b.category)}</div>
+            </div>
+            <div class="budget-category-total">${formatCurrency(b.amount)}<span class="per-month">/mo</span></div>
+            <div class="budget-actions">
+              <button class="btn-ghost budget-edit" data-id="${b.id}" style="padding:5px 10px;font-size:12px;">Edit</button>
+              <button class="btn-ghost budget-delete" data-id="${b.id}" style="padding:5px 10px;font-size:12px;color:var(--red);">Del</button>
             </div>
           </div>
-          <div class="budget-actions">
-            <button class="btn-ghost budget-edit" data-id="${b.id}" style="padding:5px 10px;font-size:12px;">Edit</button>
-            <button class="btn-ghost budget-delete" data-id="${b.id}" style="padding:5px 10px;font-size:12px;color:var(--red);">Delete</button>
+          <div class="budget-items-list hidden" data-budget-id="${b.id}">
+            ${itemsHtml}
+            <button class="btn-ghost btn-add-line-item" data-budget-id="${b.id}" style="width:100%;margin-top:8px;font-size:13px;">+ Add item</button>
           </div>
-        </div>
-        <div class="budget-bar-bg">
-          <div class="budget-bar-fill ${status}" style="width:${pct}%"></div>
-        </div>
-      </div>`;
-    }).join('');
+        </div>`;
+      }).join('')}
+    `;
 
+    container.querySelectorAll('.budget-toggle').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const list = container.querySelector(`.budget-items-list[data-budget-id="${btn.dataset.budgetId}"]`);
+        list.classList.toggle('hidden');
+        btn.textContent = list.classList.contains('hidden') ? '▶' : '▼';
+      });
+    });
     container.querySelectorAll('.budget-edit').forEach(btn => {
       btn.addEventListener('click', () => openEditBudget(btn.dataset.id));
     });
     container.querySelectorAll('.budget-delete').forEach(btn => {
       btn.addEventListener('click', () => deleteBudget(btn.dataset.id));
+    });
+    container.querySelectorAll('.line-item-edit').forEach(btn => {
+      btn.addEventListener('click', () => openEditLineItem(btn.dataset.budgetId, btn.dataset.itemId));
+    });
+    container.querySelectorAll('.line-item-delete').forEach(btn => {
+      btn.addEventListener('click', () => deleteLineItem(btn.dataset.budgetId, btn.dataset.itemId));
+    });
+    container.querySelectorAll('.btn-add-line-item').forEach(btn => {
+      btn.addEventListener('click', () => openAddLineItem(btn.dataset.budgetId));
     });
   }
 
@@ -541,12 +601,17 @@ const App = (() => {
   }
 
   async function loadPresetBudgets() {
-    if (!confirm('This will add preset budgets from your Excel sheet. Existing budgets will not be changed. Continue?')) return;
+    if (!confirm('This will add preset budgets from your spreadsheet. Existing budgets will not be changed. Continue?')) return;
     let added = 0;
     for (const preset of PRESET_BUDGETS) {
       const exists = budgets.some(b => b.category === preset.category);
       if (!exists) {
-        const b = { id: crypto.randomUUID(), category: preset.category, amount: preset.amount };
+        const b = {
+          id: crypto.randomUUID(),
+          category: preset.category,
+          amount: preset.amount,
+          items: (preset.items || []).map(item => ({ id: crypto.randomUUID(), name: item.name, amount: item.amount })),
+        };
         await SB.upsertBudget(b);
         budgets.push(b);
         added++;
@@ -560,6 +625,8 @@ const App = (() => {
     document.getElementById('btn-add-budget')?.addEventListener('click', openAddBudget);
     document.getElementById('btn-load-presets')?.addEventListener('click', loadPresetBudgets);
     document.getElementById('form-budget')?.addEventListener('submit', saveBudget);
+    document.getElementById('form-line-item')?.addEventListener('submit', saveLineItem);
+    document.getElementById('budget-cat-filter')?.addEventListener('change', renderBudgets);
   }
 
   function openAddBudget() {
@@ -582,10 +649,12 @@ const App = (() => {
   async function saveBudget(e) {
     e.preventDefault();
     const id = document.getElementById('budget-id').value || crypto.randomUUID();
+    const existing = budgets.find(x => x.id === id);
     const b = {
       id,
       category: document.getElementById('budget-category').value,
       amount: parseFloat(document.getElementById('budget-amount').value),
+      items: existing?.items || [],
     };
     try {
       await SB.upsertBudget(b);
@@ -607,6 +676,83 @@ const App = (() => {
       renderBudgets();
     } catch (err) {
       alert('Failed to delete: ' + err.message);
+    }
+  }
+
+  // ===== Line Items =====
+  function openAddLineItem(budgetId) {
+    document.getElementById('line-item-budget-id').value = budgetId;
+    document.getElementById('line-item-id').value = '';
+    document.getElementById('form-line-item').reset();
+    document.getElementById('line-item-modal-title').textContent = 'Add Item';
+    document.getElementById('modal-line-item').classList.remove('hidden');
+  }
+
+  function openEditLineItem(budgetId, itemId) {
+    const budget = budgets.find(b => b.id === budgetId);
+    if (!budget) return;
+    const item = (budget.items || []).find(i => i.id === itemId);
+    if (!item) return;
+    document.getElementById('line-item-budget-id').value = budgetId;
+    document.getElementById('line-item-id').value = itemId;
+    document.getElementById('line-item-name').value = item.name;
+    document.getElementById('line-item-amount').value = item.amount;
+    document.getElementById('line-item-modal-title').textContent = 'Edit Item';
+    document.getElementById('modal-line-item').classList.remove('hidden');
+  }
+
+  async function saveLineItem(e) {
+    e.preventDefault();
+    const budgetId = document.getElementById('line-item-budget-id').value;
+    const itemId = document.getElementById('line-item-id').value;
+    const name = document.getElementById('line-item-name').value.trim();
+    const amount = parseFloat(document.getElementById('line-item-amount').value);
+
+    const budget = budgets.find(b => b.id === budgetId);
+    if (!budget) return;
+
+    if (!budget.items) budget.items = [];
+
+    if (itemId) {
+      const idx = budget.items.findIndex(i => i.id === itemId);
+      if (idx >= 0) budget.items[idx] = { id: itemId, name, amount };
+    } else {
+      budget.items.push({ id: crypto.randomUUID(), name, amount });
+    }
+
+    budget.amount = budget.items.reduce((s, i) => s + i.amount, 0);
+
+    try {
+      await SB.upsertBudget(budget);
+      closeModals();
+      renderBudgets();
+      // Re-open the category so user sees their change
+      const toggle = document.querySelector(`.budget-toggle[data-budget-id="${budgetId}"]`);
+      if (toggle) {
+        const list = document.querySelector(`.budget-items-list[data-budget-id="${budgetId}"]`);
+        if (list && list.classList.contains('hidden')) toggle.click();
+      }
+    } catch (err) {
+      alert('Failed to save item: ' + err.message);
+    }
+  }
+
+  async function deleteLineItem(budgetId, itemId) {
+    if (!confirm('Delete this item?')) return;
+    const budget = budgets.find(b => b.id === budgetId);
+    if (!budget) return;
+    budget.items = (budget.items || []).filter(i => i.id !== itemId);
+    budget.amount = budget.items.reduce((s, i) => s + i.amount, 0);
+    try {
+      await SB.upsertBudget(budget);
+      renderBudgets();
+      const toggle = document.querySelector(`.budget-toggle[data-budget-id="${budgetId}"]`);
+      if (toggle) {
+        const list = document.querySelector(`.budget-items-list[data-budget-id="${budgetId}"]`);
+        if (list && list.classList.contains('hidden')) toggle.click();
+      }
+    } catch (err) {
+      alert('Failed to delete item: ' + err.message);
     }
   }
 

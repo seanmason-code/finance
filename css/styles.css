@@ -416,6 +416,67 @@ body {
 
 .budget-actions { display: flex; gap: 6px; }
 
+.budget-filter-bar {
+  margin-bottom: 16px;
+}
+.budget-filter-bar select {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  font-size: 14px;
+}
+
+.budget-grand-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  margin-bottom: 12px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+.budget-grand-total strong {
+  font-size: 18px;
+  color: var(--text);
+}
+
+.budget-category-total {
+  font-weight: 700;
+  font-size: 16px;
+  white-space: nowrap;
+  margin-right: 8px;
+}
+.budget-category-total .per-month {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.budget-items-list {
+  border-top: 1px solid var(--border);
+  margin-top: 10px;
+  padding-top: 10px;
+}
+.budget-items-list.hidden { display: none; }
+
+.budget-line-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+.budget-line-item:last-of-type { border-bottom: none; }
+.line-item-name { flex: 1; color: var(--text); }
+.line-item-amount { font-weight: 600; white-space: nowrap; min-width: 70px; text-align: right; }
+
 /* ===== AI Chat ===== */
 #ai-chat {
   background: var(--card);
