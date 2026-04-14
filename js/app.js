@@ -239,47 +239,36 @@ const App = (() => {
     if (expWk) expWk.textContent = `${formatCurrency(weeklyExpenses)}/wk`;
     if (netWk) netWk.textContent = `${formatCurrency(net * 12 / 52)}/wk`;
 
-    renderPaceCard(income, expenses);
+    renderPaceCard();
     Charts.renderCategoryChart(monthTxns);
     Charts.renderTimelineChart(transactions);
     renderRecentTransactions();
   }
 
-  function renderPaceCard(income, expenses) {
+  function renderPaceCard() {
     const card = document.getElementById('pace-card');
     if (!card) return;
 
+    // Rolling 31-day window
     const now = new Date();
-    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    const dayOfMonth = now.getDate();
-    const totalBudget = budgets.reduce((s, b) => s + b.amount, 0);
-    const monthName = now.toLocaleDateString('en', { month: 'long' });
+    const cutoff = new Date(now);
+    cutoff.setDate(cutoff.getDate() - 31);
+    const cutoffStr = cutoff.toISOString().slice(0, 10);
 
-    // If no income recorded yet, fall back to expense-only pace
-    if (income === 0 && totalBudget === 0) { card.innerHTML = ''; return; }
+    const rolling = transactions.filter(t => t.date >= cutoffStr && t.category !== 'Transfer');
+    const income = rolling.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+    const expenses = rolling.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
 
-    let ahead, diff, detail;
+    if (income === 0 && expenses === 0) { card.innerHTML = ''; return; }
 
-    if (income > 0) {
-      // Option B: net position — income received minus expenses vs expected net
-      const net = income - expenses;
-      const expectedNet = (dayOfMonth / daysInMonth) * totalBudget * 0.05; // small positive buffer expected
-      ahead = net >= 0;
-      diff = Math.abs(net);
-      detail = `Received ${formatCurrency(income)} · Spent ${formatCurrency(expenses)} in ${monthName}`;
-    } else {
-      // Fallback: expense pace only
-      const expected = (dayOfMonth / daysInMonth) * totalBudget;
-      diff = Math.abs(expected - expenses);
-      ahead = expenses <= expected;
-      detail = `Spent ${formatCurrency(expenses)} of ${formatCurrency(expected)} expected in ${monthName}`;
-    }
+    const net = income - expenses;
+    const ahead = net >= 0;
 
     card.innerHTML = `
       <div class="pace-card ${ahead ? 'ahead' : 'behind'}">
         <div class="pace-status">${ahead ? '✅' : '⚠️'} ${ahead ? 'AHEAD' : 'BEHIND'}</div>
-        <div class="pace-amount">${ahead ? '+' : '-'}${formatCurrency(diff)} net position</div>
-        <div class="pace-detail">${detail}</div>
+        <div class="pace-amount">${ahead ? '+' : '-'}${formatCurrency(Math.abs(net))} net position</div>
+        <div class="pace-detail">Last 31 days · Received ${formatCurrency(income)} · Spent ${formatCurrency(expenses)}</div>
         ${!ahead ? `<button class="pace-drill" id="btn-pace-drill">→ See what's over budget</button>` : ''}
       </div>
     `;
