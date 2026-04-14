@@ -371,6 +371,17 @@ const App = (() => {
       document.getElementById(id)?.addEventListener('change', applyFilters);
     });
     document.getElementById('filter-search')?.addEventListener('input', applyFilters);
+    populateCategoryFilter();
+  }
+
+  function populateCategoryFilter() {
+    const select = document.getElementById('filter-category');
+    if (!select) return;
+    const used = [...new Set(transactions.map(t => t.category).filter(Boolean))].sort();
+    const current = select.value;
+    select.innerHTML = '<option value="">All Categories</option>' +
+      used.map(c => `<option value="${c}">${categoryIcon(c)} ${escHtml(c)}</option>`).join('');
+    if (current) select.value = current;
   }
 
   // ===== Transaction HTML =====
