@@ -913,6 +913,7 @@ const App = (() => {
     });
     document.getElementById('import-file')?.addEventListener('change', importData);
     document.getElementById('btn-clear-data')?.addEventListener('click', clearAllData);
+    document.getElementById('btn-remove-duplicates')?.addEventListener('click', removeDuplicates);
   }
 
   function exportData() {
@@ -944,6 +945,59 @@ const App = (() => {
       alert('Import failed: ' + err.message);
     }
     e.target.value = '';
+  }
+
+  async function removeDuplicates() {
+    const resultEl = document.getElementById('duplicate-result');
+    const btn = document.getElementById('btn-remove-duplicates');
+    btn.disabled = true;
+    btn.textContent = 'Scanning...';
+    resultEl.textContent = '';
+
+    const seen = new Map();
+    const toDelete = [];
+
+    // Sort by date so we keep the earliest-inserted copy
+    const sorted = [...transactions].sort((a, b) => a.date.localeCompare(b.date));
+    for (const t of sorted) {
+      const key = `${t.date}|${t.description}|${Math.round(t.amount * 100)}|${t.type}`;
+      if (seen.has(key)) {
+        toDelete.push(t.id);
+      } else {
+        seen.set(key, t.id);
+      }
+    }
+
+    if (toDelete.length === 0) {
+      resultEl.textContent = 'No duplicates found.';
+      btn.disabled = false;
+      btn.textContent = 'Find & Remove Duplicates';
+      return;
+    }
+
+    if (!confirm(`Found ${toDelete.length} duplicate transaction${toDelete.length !== 1 ? 's' : ''}. Remove them?`)) {
+      btn.disabled = false;
+      btn.textContent = 'Find & Remove Duplicates';
+      return;
+    }
+
+    let removed = 0;
+    for (const id of toDelete) {
+      try {
+        await SB.deleteTransaction(id);
+        const idx = transactions.findIndex(t => t.id === id);
+        if (idx !== -1) transactions.splice(idx, 1);
+        removed++;
+        btn.textContent = `Removing... ${Math.round((removed / toDelete.length) * 100)}%`;
+      } catch (err) {
+        console.error('Failed to delete duplicate:', err);
+      }
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Find & Remove Duplicates';
+    resultEl.textContent = `Done — removed ${removed} duplicate${removed !== 1 ? 's' : ''}.`;
+    refreshCurrentPage();
   }
 
   async function clearAllData() {
