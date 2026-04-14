@@ -5,8 +5,8 @@ const CSVImport = (() => {
 
   const EXP_CATS = [
     'Housing', 'Food & Dining', 'Transport', 'Health',
-    'Entertainment', 'Shopping', 'Utilities', 'Education',
-    'Personal Care', 'Other'
+    'Entertainment', 'Shopping', 'Utilities', 'Kids',
+    'Education', 'Personal Care', 'Other'
   ];
   const INC_CATS = ['Salary', 'Freelance', 'Investment', 'Gift', 'Rental Income', 'Other Income'];
 
@@ -181,6 +181,8 @@ const CSVImport = (() => {
     if (/NETFLIX|SPOTIFY|DISNEY|AMAZON PRIME|PRIME VIDEO|GAMING|STEAM|CINEMA|MOVIES|THEATRE|CONCERT|SKY TV|NEON/.test(d)) return 'Entertainment';
     // Shopping
     if (/WAREHOUSE|KMART|FARMERS|MITRE|BUNNINGS|TRADEME/.test(d)) return 'Shopping';
+    // Kids
+    if (/SWIMMING|SWIM LESSON|REMUERA|KINDO|SCHOOL FEE|UNIFORM|SKIDS|APPLES|GAMEDAYNZ/.test(d)) return 'Kids';
     // Education
     if (/SCHOOL|UNIVERSIT|COURSE|STATIONERY|WHITCO/.test(d)) return 'Education';
     // Personal Care

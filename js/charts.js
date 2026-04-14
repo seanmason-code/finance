@@ -2,6 +2,10 @@
 const Charts = (() => {
   let categoryChart = null;
   let timelineChart = null;
+  let budgetVsActualChart = null;
+  let budgetTrendChart = null;
+  let spendingTrendChart = null;
+  let topMerchantsChart = null;
 
   const CATEGORY_COLORS = [
     '#6c63ff', '#22c55e', '#f59e0b', '#ef4444', '#3b82f6',
@@ -135,12 +139,165 @@ const Charts = (() => {
     });
   }
 
+  function renderBudgetVsActualChart(budgets, transactions, monthKey) {
+    const canvas = document.getElementById('chart-budget-vs-actual');
+    if (!canvas) return;
+
+    const actualByCategory = {};
+    transactions
+      .filter(t => t.type === 'expense' && t.date.startsWith(monthKey))
+      .forEach(t => { actualByCategory[t.category] = (actualByCategory[t.category] || 0) + t.amount; });
+
+    const labels = budgets.map(b => b.category);
+    const budgetData = budgets.map(b => b.amount);
+    const actualData = budgets.map(b => actualByCategory[b.category] || 0);
+
+    if (budgetVsActualChart) budgetVsActualChart.destroy();
+    budgetVsActualChart = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Budget', data: budgetData, backgroundColor: 'rgba(108,99,255,0.35)', borderColor: '#6c63ff', borderWidth: 1, borderRadius: 4 },
+          {
+            label: 'Actual', data: actualData,
+            backgroundColor: actualData.map((v, i) => v > budgetData[i] ? 'rgba(239,68,68,0.7)' : 'rgba(34,197,94,0.7)'),
+            borderColor: actualData.map((v, i) => v > budgetData[i] ? '#ef4444' : '#22c55e'),
+            borderWidth: 1, borderRadius: 4,
+          }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+        plugins: {
+          legend: { position: 'top' },
+          tooltip: { callbacks: { label: (ctx) => ` ${ctx.dataset.label}: ${formatCurrency(ctx.raw)}` } }
+        },
+        scales: {
+          x: { grid: { color: 'rgba(42,42,69,0.5)' }, ticks: { callback: (v) => formatCurrency(v, true) } },
+          y: { grid: { color: 'rgba(42,42,69,0.5)' } }
+        }
+      }
+    });
+  }
+
+  function renderBudgetTrendChart(budgets, transactions, months = 6) {
+    const canvas = document.getElementById('chart-budget-trend');
+    if (!canvas) return;
+
+    const totalBudget = budgets.reduce((s, b) => s + b.amount, 0);
+    const now = new Date();
+    const labels = [], actualData = [], budgetData = [];
+
+    for (let i = months - 1; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      labels.push(d.toLocaleDateString('en', { month: 'short', year: '2-digit' }));
+      actualData.push(transactions.filter(t => t.type === 'expense' && t.date.startsWith(key)).reduce((s, t) => s + t.amount, 0));
+      budgetData.push(totalBudget);
+    }
+
+    if (budgetTrendChart) budgetTrendChart.destroy();
+    budgetTrendChart = new Chart(canvas, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Total Budget', data: budgetData, borderColor: '#6c63ff', backgroundColor: 'transparent', borderDash: [5, 5], pointRadius: 3, tension: 0 },
+          { label: 'Actual Spending', data: actualData, borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.1)', pointRadius: 3, tension: 0.3, fill: true }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'top' },
+          tooltip: { callbacks: { label: (ctx) => ` ${ctx.dataset.label}: ${formatCurrency(ctx.raw)}` } }
+        },
+        scales: {
+          x: { grid: { color: 'rgba(42,42,69,0.5)' } },
+          y: { grid: { color: 'rgba(42,42,69,0.5)' }, ticks: { callback: (v) => formatCurrency(v, true) }, beginAtZero: true }
+        }
+      }
+    });
+  }
+
+  function renderSpendingTrendChart(transactions, months = 12) {
+    const canvas = document.getElementById('chart-spending-trend');
+    if (!canvas) return;
+
+    const now = new Date();
+    const labels = [], data = [];
+    for (let i = months - 1; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      labels.push(d.toLocaleDateString('en', { month: 'short', year: '2-digit' }));
+      data.push(transactions.filter(t => t.type === 'expense' && t.date.startsWith(key)).reduce((s, t) => s + t.amount, 0));
+    }
+
+    if (spendingTrendChart) spendingTrendChart.destroy();
+    spendingTrendChart = new Chart(canvas, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{ label: 'Monthly Spending', data, borderColor: '#6c63ff', backgroundColor: 'rgba(108,99,255,0.1)', pointRadius: 4, tension: 0.3, fill: true }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: (ctx) => ` ${formatCurrency(ctx.raw)}` } }
+        },
+        scales: {
+          x: { grid: { color: 'rgba(42,42,69,0.5)' } },
+          y: { grid: { color: 'rgba(42,42,69,0.5)' }, ticks: { callback: (v) => formatCurrency(v, true) }, beginAtZero: true }
+        }
+      }
+    });
+  }
+
+  function renderTopMerchantsChart(transactions, monthKey) {
+    const canvas = document.getElementById('chart-top-merchants');
+    if (!canvas) return;
+
+    const byMerchant = {};
+    transactions
+      .filter(t => t.type === 'expense' && t.date.startsWith(monthKey))
+      .forEach(t => { byMerchant[t.description] = (byMerchant[t.description] || 0) + t.amount; });
+
+    const sorted = Object.entries(byMerchant).sort((a, b) => b[1] - a[1]).slice(0, 10);
+    if (!sorted.length) { canvas.parentElement.innerHTML = '<p style="color:var(--text-muted);font-size:13px;padding:20px 0">No transactions this month</p>'; return; }
+
+    if (topMerchantsChart) topMerchantsChart.destroy();
+    topMerchantsChart = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels: sorted.map(([k]) => k),
+        datasets: [{ label: 'Amount', data: sorted.map(([, v]) => v), backgroundColor: CATEGORY_COLORS.slice(0, sorted.length), borderWidth: 0, borderRadius: 4 }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: (ctx) => ` ${formatCurrency(ctx.raw)}` } }
+        },
+        scales: {
+          x: { grid: { color: 'rgba(42,42,69,0.5)' }, ticks: { callback: (v) => formatCurrency(v, true) } },
+          y: { grid: { color: 'rgba(42,42,69,0.5)' } }
+        }
+      }
+    });
+  }
+
   function destroyAll() {
     if (categoryChart) { categoryChart.destroy(); categoryChart = null; }
     if (timelineChart) { timelineChart.destroy(); timelineChart = null; }
+    if (budgetVsActualChart) { budgetVsActualChart.destroy(); budgetVsActualChart = null; }
+    if (budgetTrendChart) { budgetTrendChart.destroy(); budgetTrendChart = null; }
+    if (spendingTrendChart) { spendingTrendChart.destroy(); spendingTrendChart = null; }
+    if (topMerchantsChart) { topMerchantsChart.destroy(); topMerchantsChart = null; }
   }
 
-  return { renderCategoryChart, renderTimelineChart, destroyAll };
+  return { renderCategoryChart, renderTimelineChart, renderBudgetVsActualChart, renderBudgetTrendChart, renderSpendingTrendChart, renderTopMerchantsChart, destroyAll };
 })();
 
 // Currency format helper (global, used by charts + app)

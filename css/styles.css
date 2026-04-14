@@ -1103,3 +1103,58 @@ body {
   margin-left: 6px;
   vertical-align: middle;
 }
+
+/* ===== Reports Page ===== */
+.month-selector {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.month-selector .btn-ghost {
+  padding: 6px 10px;
+}
+
+.reports-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.report-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+.report-card-wide {
+  grid-column: span 2;
+}
+
+.report-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.report-chart-wrap {
+  position: relative;
+  height: 280px;
+}
+
+.report-chart-wrap canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+@media (max-width: 700px) {
+  .reports-grid { grid-template-columns: 1fr; }
+  .report-card-wide { grid-column: span 1; }
+}

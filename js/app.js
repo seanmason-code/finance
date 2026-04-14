@@ -197,6 +197,7 @@ const App = (() => {
     if (page === 'transactions') renderTransactionsList();
     if (page === 'budgets') renderBudgets();
     if (page === 'recurring') renderRecurring();
+    if (page === 'reports') renderReports();
   }
 
   // ===== Dashboard =====
@@ -344,12 +345,27 @@ const App = (() => {
     });
   }
 
+  const PRESET_BUDGETS = [
+    { category: 'Housing',      amount: 8621 },
+    { category: 'Food & Dining', amount: 1625 },
+    { category: 'Transport',    amount: 996  },
+    { category: 'Utilities',    amount: 697  },
+    { category: 'Health',       amount: 350  },
+    { category: 'Entertainment', amount: 91  },
+    { category: 'Kids',         amount: 2007 },
+    { category: 'Shopping',     amount: 400  },
+    { category: 'Personal Care', amount: 150 },
+    { category: 'Other',        amount: 300  },
+  ];
+
+  let _reportDate = new Date();
+
   function categoryIcon(category) {
     const icons = {
       'Housing': '🏠', 'Food & Dining': '🍽️', 'Transport': '🚗', 'Health': '💊',
-      'Entertainment': '🎬', 'Shopping': '🛍️', 'Utilities': '💡', 'Education': '📚',
-      'Personal Care': '💇', 'Salary': '💼', 'Freelance': '💻', 'Investment': '📈',
-      'Gift': '🎁', 'Other Income': '💰', 'Other': '📌'
+      'Entertainment': '🎬', 'Shopping': '🛍️', 'Utilities': '💡', 'Kids': '👶',
+      'Education': '📚', 'Personal Care': '💇', 'Salary': '💼', 'Freelance': '💻',
+      'Investment': '📈', 'Gift': '🎁', 'Other Income': '💰', 'Other': '📌'
     };
     return icons[category] || '💳';
   }
@@ -499,8 +515,50 @@ const App = (() => {
     });
   }
 
+  // ===== Reports =====
+  function reportMonthKey() {
+    return `${_reportDate.getFullYear()}-${String(_reportDate.getMonth() + 1).padStart(2, '0')}`;
+  }
+
+  function renderReports() {
+    const label = _reportDate.toLocaleDateString('en', { month: 'long', year: 'numeric' });
+    document.getElementById('reports-month-label').textContent = label;
+
+    const monthKey = reportMonthKey();
+    Charts.renderBudgetVsActualChart(budgets, transactions, monthKey);
+    Charts.renderBudgetTrendChart(budgets, transactions);
+    Charts.renderSpendingTrendChart(transactions);
+    Charts.renderTopMerchantsChart(transactions, monthKey);
+
+    document.getElementById('reports-prev-month').onclick = () => {
+      _reportDate = new Date(_reportDate.getFullYear(), _reportDate.getMonth() - 1, 1);
+      renderReports();
+    };
+    document.getElementById('reports-next-month').onclick = () => {
+      _reportDate = new Date(_reportDate.getFullYear(), _reportDate.getMonth() + 1, 1);
+      renderReports();
+    };
+  }
+
+  async function loadPresetBudgets() {
+    if (!confirm('This will add preset budgets from your Excel sheet. Existing budgets will not be changed. Continue?')) return;
+    let added = 0;
+    for (const preset of PRESET_BUDGETS) {
+      const exists = budgets.some(b => b.category === preset.category);
+      if (!exists) {
+        const b = { id: crypto.randomUUID(), category: preset.category, amount: preset.amount };
+        await SB.upsertBudget(b);
+        budgets.push(b);
+        added++;
+      }
+    }
+    renderBudgets();
+    showToast(added > 0 ? `Added ${added} preset budgets` : 'All preset categories already have budgets');
+  }
+
   function bindBudgetModal() {
     document.getElementById('btn-add-budget')?.addEventListener('click', openAddBudget);
+    document.getElementById('btn-load-presets')?.addEventListener('click', loadPresetBudgets);
     document.getElementById('form-budget')?.addEventListener('submit', saveBudget);
   }
 
