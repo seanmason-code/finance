@@ -144,7 +144,8 @@ const App = (() => {
     bindSignOut();
     bindMobileMenu();
 
-    renderDashboard();
+    const lastPage = localStorage.getItem('lastPage') || 'dashboard';
+    navigateTo(lastPage);
   }
 
   function bindMobileMenu() {
@@ -192,6 +193,7 @@ const App = (() => {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.querySelector(`[data-page="${page}"]`)?.classList.add('active');
     document.getElementById(`page-${page}`)?.classList.add('active');
+    localStorage.setItem('lastPage', page);
 
     if (page === 'dashboard') renderDashboard();
     if (page === 'transactions') renderTransactionsList();
@@ -601,24 +603,30 @@ const App = (() => {
   }
 
   async function loadPresetBudgets() {
-    if (!confirm('This will add preset budgets from your spreadsheet. Existing budgets will not be changed. Continue?')) return;
-    let added = 0;
+    if (!confirm('This will load all preset budgets and line items, updating any existing ones. Continue?')) return;
+    let count = 0;
     for (const preset of PRESET_BUDGETS) {
-      const exists = budgets.some(b => b.category === preset.category);
-      if (!exists) {
-        const b = {
-          id: crypto.randomUUID(),
-          category: preset.category,
-          amount: preset.amount,
-          items: (preset.items || []).map(item => ({ id: crypto.randomUUID(), name: item.name, amount: item.amount })),
-        };
+      const existing = budgets.find(b => b.category === preset.category);
+      const b = {
+        id: existing?.id || crypto.randomUUID(),
+        category: preset.category,
+        amount: preset.amount,
+        items: (preset.items || []).map(item => ({ id: crypto.randomUUID(), name: item.name, amount: item.amount })),
+      };
+      try {
         await SB.upsertBudget(b);
-        budgets.push(b);
-        added++;
+      } catch (err) {
+        // items column may not exist yet — save without items as fallback
+        await SB.upsertBudget({ id: b.id, category: b.category, amount: b.amount });
+        b.items = [];
       }
+      const idx = budgets.findIndex(x => x.category === preset.category);
+      if (idx >= 0) budgets[idx] = b;
+      else budgets.push(b);
+      count++;
     }
     renderBudgets();
-    showToast(added > 0 ? `Added ${added} preset budgets` : 'All preset categories already have budgets');
+    showToast(`Loaded ${count} preset budgets`);
   }
 
   function bindBudgetModal() {
@@ -657,7 +665,7 @@ const App = (() => {
       items: existing?.items || [],
     };
     try {
-      await SB.upsertBudget(b);
+      await upsertBudgetSafe(b);
       const idx = budgets.findIndex(x => x.id === id);
       if (idx >= 0) budgets[idx] = b;
       else budgets.push(b);
@@ -723,7 +731,7 @@ const App = (() => {
     budget.amount = budget.items.reduce((s, i) => s + i.amount, 0);
 
     try {
-      await SB.upsertBudget(budget);
+      await upsertBudgetSafe(budget);
       closeModals();
       renderBudgets();
       // Re-open the category so user sees their change
@@ -744,7 +752,7 @@ const App = (() => {
     budget.items = (budget.items || []).filter(i => i.id !== itemId);
     budget.amount = budget.items.reduce((s, i) => s + i.amount, 0);
     try {
-      await SB.upsertBudget(budget);
+      await upsertBudgetSafe(budget);
       renderBudgets();
       const toggle = document.querySelector(`.budget-toggle[data-budget-id="${budgetId}"]`);
       if (toggle) {
@@ -753,6 +761,16 @@ const App = (() => {
       }
     } catch (err) {
       alert('Failed to delete item: ' + err.message);
+    }
+  }
+
+  // Tries to save with items; falls back to without if column doesn't exist
+  async function upsertBudgetSafe(b) {
+    try {
+      await SB.upsertBudget(b);
+    } catch (err) {
+      const { id, category, amount } = b;
+      await SB.upsertBudget({ id, category, amount });
     }
   }
 
