@@ -312,6 +312,15 @@ const App = (() => {
     const now = new Date();
     const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
+    // DEBUG: show distinct account IDs in transactions
+    const debugEl = document.getElementById('accounts-debug');
+    if (debugEl) {
+      const ids = [...new Set(transactions.map(t => t.account).filter(Boolean))].sort();
+      debugEl.innerHTML = ids.length
+        ? `<strong>Account IDs in your transactions:</strong><br>${ids.map(id => `<code>${escHtml(id)}</code>`).join('<br>')}`
+        : '<strong>No account IDs found in transactions</strong> — transactions may have been imported without account linking.';
+    }
+
     const totalBalance = accounts.reduce((s, a) => s + (a.balance || 0), 0);
     const monthIncome = transactions.filter(t => t.type === 'income' && t.category !== 'Transfer' && t.date.startsWith(thisMonth)).reduce((s, t) => s + t.amount, 0);
     const monthExpense = transactions.filter(t => t.type === 'expense' && t.category !== 'Transfer' && t.date.startsWith(thisMonth)).reduce((s, t) => s + t.amount, 0);
