@@ -316,15 +316,6 @@ const App = (() => {
     const now = new Date();
     const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-    // DEBUG: show distinct account IDs in transactions
-    const debugEl = document.getElementById('accounts-debug');
-    if (debugEl) {
-      const ids = [...new Set(transactions.map(t => t.account).filter(Boolean))].sort();
-      debugEl.innerHTML = ids.length
-        ? `<strong>Account IDs in your transactions:</strong><br>${ids.map(id => `<code>${escHtml(id)}</code>`).join('<br>')}`
-        : '<strong>No account IDs found in transactions</strong> — transactions may have been imported without account linking.';
-    }
-
     const totalBalance = accounts.reduce((s, a) => s + (a.balance || 0), 0);
     const monthIncome = transactions.filter(t => t.type === 'income' && t.category !== 'Transfer' && t.date.startsWith(thisMonth)).reduce((s, t) => s + t.amount, 0);
     const monthExpense = transactions.filter(t => t.type === 'expense' && t.category !== 'Transfer' && t.date.startsWith(thisMonth)).reduce((s, t) => s + t.amount, 0);
@@ -363,6 +354,51 @@ const App = (() => {
     listEl.querySelectorAll('.account-card').forEach(card => {
       card.addEventListener('click', () => openEditAccount(card.dataset.id));
     });
+
+    renderServiceAccounts();
+  }
+
+  function renderServiceAccounts() {
+    const el = document.getElementById('service-accounts-list');
+    if (!el) return;
+
+    if (serviceAccounts.length === 0) {
+      el.innerHTML = `<div class="accounts-empty" style="padding:16px 0"><p>No service accounts yet. Add one to track provider balances.</p></div>`;
+      return;
+    }
+
+    el.innerHTML = `<div class="accounts-grid">${serviceAccounts.map(a => serviceAccountCardHTML(a)).join('')}</div>`;
+    el.querySelectorAll('.service-account-card').forEach(card => {
+      card.addEventListener('click', () => openEditServiceAccount(card.dataset.id));
+    });
+  }
+
+  function serviceAccountCardHTML(a) {
+    const color = a.color || '#6c63ff';
+    const balance = a.balance || 0;
+    const balanceColor = balance >= 0 ? 'var(--green)' : 'var(--red)';
+    const updatedAt = a.balance_updated_at
+      ? (() => {
+          const d = new Date(a.balance_updated_at);
+          const diff = Math.round((Date.now() - d) / 86400000);
+          return diff === 0 ? 'Updated today' : diff === 1 ? 'Updated yesterday' : `Updated ${diff} days ago`;
+        })()
+      : 'Not yet updated';
+
+    return `
+      <div class="service-account-card account-card" data-id="${a.id}" style="cursor:pointer">
+        <div class="account-card-top">
+          <div class="account-bank-icon" style="background:${color}22;color:${color};font-size:22px">🏷️</div>
+          <div class="account-card-info">
+            <div class="account-card-name">${escHtml(a.name)}</div>
+            <div class="account-card-meta">${escHtml(a.notes || 'Service account')}</div>
+          </div>
+        </div>
+        <div class="account-card-balance">
+          <div class="account-card-balance-amount" style="color:${balanceColor}">${formatCurrency(balance)}</div>
+          <div class="account-card-balance-updated">${updatedAt}</div>
+        </div>
+      </div>`;
   }
 
   function accountCardHTML(a, thisMonth) {
