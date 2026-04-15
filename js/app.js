@@ -1726,6 +1726,7 @@ const App = (() => {
   // ===== Export / Import =====
   function bindExportImport() {
     document.getElementById('btn-export')?.addEventListener('click', exportData);
+  document.getElementById('btn-export-csv')?.addEventListener('click', exportCSV);
     document.getElementById('btn-import')?.addEventListener('click', () => {
       document.getElementById('import-file').click();
     });
@@ -1742,6 +1743,27 @@ const App = (() => {
     const a = document.createElement('a');
     a.href = url;
     a.download = `finance-export-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function exportCSV() {
+    const headers = ['date', 'description', 'amount', 'type', 'category', 'account', 'notes'];
+    const rows = transactions.map(t => [
+      t.date || '',
+      `"${(t.description || '').replace(/"/g, '""')}"`,
+      t.type === 'expense' ? `-${t.amount}` : t.amount,
+      t.type || '',
+      t.category || '',
+      t.account || '',
+      `"${(t.notes || '').replace(/"/g, '""')}"`,
+    ]);
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `finance-export-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
