@@ -1190,6 +1190,56 @@ body {
   }
 
   #sidebar.open { left: 0; }
+
+  .stats-grid {
+    gap: 10px;
+  }
+  .stat-card {
+    padding: 14px 12px;
+  }
+  .stat-value {
+    font-size: 18px;
+  }
+  .charts-grid {
+    grid-template-columns: 1fr;
+  }
+  .modal {
+    margin: 8px;
+    padding: 20px 16px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .modal-actions {
+    flex-direction: column;
+  }
+  .modal-actions button {
+    width: 100%;
+  }
+  .chart-card canvas {
+    max-height: 220px;
+  }
+  .chart-card {
+    padding: 14px 10px;
+  }
+  .txn-row {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .txn-amount {
+    font-size: 14px;
+  }
+  .txn-desc {
+    font-size: 13px;
+    white-space: normal;
+  }
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .page-header .btn-primary {
+    width: 100%;
+  }
 }
 
 /* ===== Header button group ===== */
