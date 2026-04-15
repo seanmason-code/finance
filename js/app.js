@@ -1757,7 +1757,7 @@ const App = (() => {
     const rows = transactions.map(t => [
       csvEscape(t.date || ''),
       csvEscape(t.description || ''),
-      t.type === 'expense' ? `-${t.amount}` : (t.amount || ''),
+      csvEscape(t.type === 'expense' ? `-${t.amount}` : String(t.amount ?? '')),
       csvEscape(t.type || ''),
       csvEscape(t.category || ''),
       csvEscape(t.account || ''),
@@ -1771,6 +1771,7 @@ const App = (() => {
     a.download = `finance-export-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+    showToast(`Exported ${transactions.length} transaction${transactions.length !== 1 ? 's' : ''} as CSV`);
   }
 
   async function importData(e) {
