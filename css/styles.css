@@ -1176,7 +1176,10 @@ body {
 
 @media (max-width: 600px) {
   #content { padding: 16px; }
-  .stats-grid { grid-template-columns: 1fr 1fr; }
+  .stats-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
   #mobile-header { display: flex; }
 
   #sidebar {
@@ -1190,10 +1193,6 @@ body {
   }
 
   #sidebar.open { left: 0; }
-
-  .stats-grid {
-    gap: 10px;
-  }
   .stat-card {
     padding: 14px 12px;
   }
