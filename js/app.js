@@ -2048,6 +2048,26 @@ const App = (() => {
       setBtnState(`Saving ${count} / ${total}`);
     }
 
+    // Patch account field on existing transactions that were imported without one
+    let accountsPatched = 0;
+    for (const row of _importRows) {
+      if (!row._isDuplicate || !row.account) continue;
+      const key = `${row.date}|${row.description}|${Math.round(row.amount * 100)}`;
+      const existing = transactions.find(t =>
+        `${t.date}|${t.description}|${Math.round(t.amount * 100)}` === key && !t.account
+      );
+      if (!existing) continue;
+      const updated = { ...existing, account: row.account };
+      try {
+        await SB.upsertTransaction(updated);
+        const idx = transactions.findIndex(t => t.id === existing.id);
+        if (idx >= 0) transactions[idx] = updated;
+        accountsPatched++;
+      } catch (err) {
+        console.error('Failed to patch account on transaction:', err);
+      }
+    }
+
     // Update account balances from closing balance in CSV (runs even if all duplicates)
     btn.innerHTML = '<span class="btn-spinner"></span> Updating balances…';
     const lastBalances = CSVImport.getLastBalances(_importRows);
@@ -2071,8 +2091,9 @@ const App = (() => {
     closeModals();
     refreshCurrentPage();
     const txnMsg = count > 0 ? `Imported ${count} transaction${count !== 1 ? 's' : ''}` : 'No new transactions';
-    const balanceMsg = balancesUpdated > 0 ? ` · ${balancesUpdated} account balance${balancesUpdated !== 1 ? 's' : ''} updated` : '';
-    showToast(`${txnMsg}${balanceMsg}`);
+    const balanceMsg = balancesUpdated > 0 ? ` · ${balancesUpdated} balance${balancesUpdated !== 1 ? 's' : ''} updated` : '';
+    const patchMsg = accountsPatched > 0 ? ` · ${accountsPatched} account link${accountsPatched !== 1 ? 's' : ''} fixed` : '';
+    showToast(`${txnMsg}${balanceMsg}${patchMsg}`);
     _importRows = [];
     _csvFiles = [];
     if (serviceAccounts.length > 0) {
