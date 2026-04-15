@@ -80,9 +80,11 @@ const CSVImport = (() => {
         const desc = buildDescKiwibank(row);
         const date = (row['Transaction Date'] || row['Effective Date'] || '').slice(0, 10);
         const category = autoCategory(desc, row['Transaction Code'] || '', amount);
+        const balance = row['Balance'] !== undefined ? parseFloat(row['Balance']) : null;
         return {
           date, description: desc, amount: Math.abs(amount), type, category,
           account: row['Account number'] || '',
+          _balance: balance,
           _internal: isInternalKiwibank(row),
         };
       })
@@ -138,9 +140,11 @@ const CSVImport = (() => {
         const desc = buildDescANZ(row);
         const date = parseANZDate(row['Date'] || '');
         const category = autoCategory(desc, row['Type'] || '', amount);
+        const balance = row['Balance'] !== undefined ? parseFloat(row['Balance']) : null;
         return {
           date, description: desc, amount: Math.abs(amount), type, category,
           account: accountFromFile,
+          _balance: balance,
           _internal: isInternalANZ(row),
         };
       })
@@ -207,5 +211,20 @@ const CSVImport = (() => {
     ).join('');
   }
 
-  return { parseCSV, processRows, categoryOptionsHTML };
+  // Returns {account_number: closing_balance} from the last transaction per account
+  function getLastBalances(rows) {
+    const byAccount = {};
+    rows.forEach(row => {
+      if (row.account && row._balance != null && !isNaN(row._balance)) {
+        if (!byAccount[row.account] || row.date >= byAccount[row.account].date) {
+          byAccount[row.account] = { date: row.date, balance: row._balance };
+        }
+      }
+    });
+    const result = {};
+    Object.entries(byAccount).forEach(([acc, data]) => { result[acc] = data.balance; });
+    return result;
+  }
+
+  return { parseCSV, processRows, categoryOptionsHTML, getLastBalances };
 })();

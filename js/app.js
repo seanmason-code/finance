@@ -1810,10 +1810,29 @@ const App = (() => {
       btn.textContent = `Importing... ${Math.round((count / total) * 100)}%`;
     }
 
+    // Update account balances from closing balance in CSV
+    const lastBalances = CSVImport.getLastBalances(_importRows);
+    let balancesUpdated = 0;
+    for (const [accountNumber, balance] of Object.entries(lastBalances)) {
+      const account = accounts.find(a => a.account_number === accountNumber);
+      if (account) {
+        const updated = { ...account, balance, balance_updated_at: new Date().toISOString().slice(0, 10) };
+        try {
+          await SB.upsertAccount(updated);
+          const idx = accounts.findIndex(a => a.id === account.id);
+          if (idx >= 0) accounts[idx] = updated;
+          balancesUpdated++;
+        } catch (err) {
+          console.error('Failed to update account balance:', err);
+        }
+      }
+    }
+
     btn.disabled = false;
     closeModals();
     refreshCurrentPage();
-    showToast(`Imported ${count} transaction${count !== 1 ? 's' : ''}`);
+    const balanceMsg = balancesUpdated > 0 ? ` · ${balancesUpdated} account balance${balancesUpdated !== 1 ? 's' : ''} updated` : '';
+    showToast(`Imported ${count} transaction${count !== 1 ? 's' : ''}${balanceMsg}`);
     _importRows = [];
     _csvFiles = [];
   }
