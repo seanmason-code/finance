@@ -1673,7 +1673,6 @@ const App = (() => {
     document.getElementById('recurring-type').value = r.type;
     document.getElementById('recurring-description').value = r.description;
     document.getElementById('recurring-amount').value = r.amount;
-    document.getElementById('recurring-category').value = r.category;
     document.getElementById('recurring-frequency').value = r.frequency;
     document.getElementById('recurring-day').value = r.day_of_month;
     document.querySelectorAll('.tab-btn-r').forEach(b => b.classList.toggle('active', b.dataset.type === r.type));
