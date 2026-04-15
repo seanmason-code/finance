@@ -2141,7 +2141,7 @@ const App = (() => {
     setTimeout(() => {
       toast.style.opacity = '0';
       setTimeout(() => toast.remove(), 200);
-    }, 3000);
+    }, type === 'error' ? 4000 : 2500);
   }
 
   function escHtml(str) {
