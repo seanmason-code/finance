@@ -951,7 +951,7 @@ const App = (() => {
   let _reportDate = new Date();
 
   const DEFAULT_EXPENSE_CATEGORIES = [
-    'Housing','Food & Dining','Transport','Transport: Fuel',
+    'Housing','Mortgage','Rates','Food & Dining','Transport','Transport: Fuel',
     'Transport: Parking & Tolls','Transport: Car Maintenance',
     'Health','Insurance','Entertainment','Subscriptions',
     'Shopping','Utilities','Kids','Travel','Savings',
@@ -1650,10 +1650,10 @@ const App = (() => {
     });
   }
 
-  function updateRecurringCategories(type) {
+  function updateRecurringCategories(type, selected = '') {
     const sel = document.getElementById('recurring-category');
     if (!sel) return;
-    sel.innerHTML = buildCategoryOptions(type);
+    sel.innerHTML = buildCategoryOptions(type, selected);
   }
 
   function openAddRecurring() {
@@ -1677,8 +1677,7 @@ const App = (() => {
     document.getElementById('recurring-frequency').value = r.frequency;
     document.getElementById('recurring-day').value = r.day_of_month;
     document.querySelectorAll('.tab-btn-r').forEach(b => b.classList.toggle('active', b.dataset.type === r.type));
-    updateRecurringCategories(r.type);
-    document.getElementById('recurring-category').value = r.category;
+    updateRecurringCategories(r.type, r.category);
     document.getElementById('modal-recurring-title').textContent = 'Edit Recurring';
     document.getElementById('modal-recurring').classList.remove('hidden');
   }
@@ -1859,10 +1858,12 @@ const App = (() => {
     const type = document.getElementById('new-category-type')?.value;
     if (!name || !type) return;
     const custom = getCustomCategories();
-    if (!(custom[type] || []).includes(name)) {
-      custom[type] = [...(custom[type] || []), name];
-      saveCustomCategories(custom);
+    if ((custom[type] || []).includes(name)) {
+      showToast(`"${name}" already exists`, 'error');
+      return;
     }
+    custom[type] = [...(custom[type] || []), name];
+    saveCustomCategories(custom);
     document.getElementById('new-category-name').value = '';
     renderCustomCategories();
     showToast(`Category "${name}" added`);
