@@ -722,6 +722,54 @@
     </div>
   </div>
 
+  <!-- Service Account Modal -->
+  <div id="modal-service-account" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2 id="modal-service-account-title">Add Service Account</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <form id="form-service-account">
+        <input type="hidden" id="service-account-id" value="" />
+        <label>Name</label>
+        <input type="text" id="service-account-name" placeholder="e.g. Watercare, Rates, Power" required />
+        <label>Notes <span class="hint-inline">(optional — e.g. Auckland Council)</span></label>
+        <input type="text" id="service-account-notes" placeholder="e.g. Auckland Council" />
+        <label>Current Balance <span class="hint-inline">(negative if you owe them)</span></label>
+        <div class="amount-input">
+          <span class="currency-symbol">$</span>
+          <input type="number" id="service-account-balance" placeholder="0.00" step="0.01" required />
+        </div>
+        <label>Colour</label>
+        <div id="service-account-color-picker" class="color-picker-row"></div>
+        <input type="hidden" id="service-account-color" value="#14b8a6" />
+        <div class="modal-actions">
+          <button type="button" id="btn-delete-service-account" class="btn-danger" style="margin-right:auto;display:none">Delete</button>
+          <button type="button" class="btn-ghost modal-close-btn">Cancel</button>
+          <button type="submit" class="btn-primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Service Balance Update Prompt (shown after CSV import) -->
+  <div id="modal-service-balance-prompt" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2>Update Service Balances?</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <p style="font-size:14px;color:var(--text2);margin-bottom:16px">While you're here — update any service account balances. Skip any you haven't checked.</p>
+      <div id="service-balance-prompt-list"></div>
+      <div class="modal-actions" style="margin-top:20px">
+        <button type="button" class="btn-ghost modal-close-btn">Skip all</button>
+        <button type="button" id="btn-save-service-balances" class="btn-primary">Save balances</button>
+      </div>
+    </div>
+  </div>
+
   <script src="js/db.js"></script>
   <script src="js/supabase-client.js"></script>
   <script src="js/charts.js"></script>

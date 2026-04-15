@@ -158,6 +158,7 @@ const App = (() => {
     bindBudgetModal();
     bindRecurringModal();
     bindAccountModal();
+    bindServiceAccountModal();
     bindAI();
     bindSettings();
     bindFilters();
@@ -530,6 +531,136 @@ const App = (() => {
       } catch (err) {
         alert('Failed to delete: ' + err.message);
       }
+    });
+  }
+
+  function openAddServiceAccount() {
+    document.getElementById('modal-service-account-title').textContent = 'Add Service Account';
+    document.getElementById('form-service-account').reset();
+    document.getElementById('service-account-id').value = '';
+    document.getElementById('service-account-color').value = '#14b8a6';
+    document.getElementById('btn-delete-service-account').style.display = 'none';
+    renderServiceColorPicker('#14b8a6');
+    document.getElementById('modal-service-account').classList.remove('hidden');
+  }
+
+  function openEditServiceAccount(id) {
+    const a = serviceAccounts.find(x => x.id === id);
+    if (!a) return;
+    document.getElementById('modal-service-account-title').textContent = 'Edit Service Account';
+    document.getElementById('service-account-id').value = a.id;
+    document.getElementById('service-account-name').value = a.name;
+    document.getElementById('service-account-notes').value = a.notes || '';
+    document.getElementById('service-account-balance').value = a.balance || 0;
+    document.getElementById('service-account-color').value = a.color || '#14b8a6';
+    document.getElementById('btn-delete-service-account').style.display = 'inline-flex';
+    renderServiceColorPicker(a.color || '#14b8a6');
+    document.getElementById('modal-service-account').classList.remove('hidden');
+  }
+
+  function renderServiceColorPicker(selected) {
+    const row = document.getElementById('service-account-color-picker');
+    if (!row) return;
+    row.innerHTML = ACCOUNT_COLORS.map(c =>
+      `<div class="color-swatch${c === selected ? ' selected' : ''}" style="background:${c}" data-color="${c}"></div>`
+    ).join('');
+    row.querySelectorAll('.color-swatch').forEach(sw => {
+      sw.addEventListener('click', () => {
+        row.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+        sw.classList.add('selected');
+        document.getElementById('service-account-color').value = sw.dataset.color;
+      });
+    });
+  }
+
+  function bindServiceAccountModal() {
+    document.getElementById('btn-add-service-account')?.addEventListener('click', openAddServiceAccount);
+
+    document.getElementById('form-service-account')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = document.getElementById('service-account-id').value || crypto.randomUUID();
+      const session = await SB.getSession();
+      const a = {
+        id,
+        user_id: session.user.id,
+        name: document.getElementById('service-account-name').value.trim(),
+        bank: 'Service',
+        owner: 'Joint',
+        account_number: '',
+        notes: document.getElementById('service-account-notes').value.trim(),
+        balance: parseFloat(document.getElementById('service-account-balance').value) || 0,
+        balance_updated_at: new Date().toISOString().slice(0, 10),
+        color: document.getElementById('service-account-color').value,
+      };
+      try {
+        await SB.upsertAccount(a);
+        const idx = serviceAccounts.findIndex(x => x.id === id);
+        if (idx >= 0) serviceAccounts[idx] = a; else serviceAccounts.push(a);
+        closeModals();
+        renderServiceAccounts();
+        renderDashboard();
+        showToast('Service account saved');
+      } catch (err) {
+        alert('Failed to save: ' + err.message);
+      }
+    });
+
+    document.getElementById('btn-delete-service-account')?.addEventListener('click', async () => {
+      const id = document.getElementById('service-account-id').value;
+      if (!id || !confirm('Delete this service account?')) return;
+      try {
+        await SB.deleteAccount(id);
+        serviceAccounts = serviceAccounts.filter(a => a.id !== id);
+        closeModals();
+        renderServiceAccounts();
+        renderDashboard();
+        showToast('Service account deleted');
+      } catch (err) {
+        alert('Failed to delete: ' + err.message);
+      }
+    });
+  }
+
+  function showServiceBalancePrompt() {
+    if (serviceAccounts.length === 0) return;
+
+    const list = document.getElementById('service-balance-prompt-list');
+    if (!list) return;
+
+    list.innerHTML = serviceAccounts.map(a => `
+      <div class="service-balance-row" style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+        <div style="flex:1;font-size:14px;font-weight:500">${escHtml(a.name)}</div>
+        <div style="font-size:12px;color:var(--text2);white-space:nowrap">Current: ${formatCurrency(a.balance || 0)}</div>
+        <input type="number" class="service-balance-input" data-id="${a.id}"
+          placeholder="New balance" step="0.01"
+          style="width:130px;padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px" />
+      </div>
+    `).join('');
+
+    document.getElementById('modal-service-balance-prompt').classList.remove('hidden');
+
+    document.getElementById('btn-save-service-balances')?.addEventListener('click', async () => {
+      const inputs = list.querySelectorAll('.service-balance-input');
+      const today = new Date().toISOString().slice(0, 10);
+      for (const input of inputs) {
+        const val = input.value.trim();
+        if (val === '') continue;
+        const id = input.dataset.id;
+        const a = serviceAccounts.find(x => x.id === id);
+        if (!a) continue;
+        const updated = { ...a, balance: parseFloat(val), balance_updated_at: today };
+        try {
+          await SB.upsertAccount(updated);
+          const idx = serviceAccounts.findIndex(x => x.id === id);
+          if (idx >= 0) serviceAccounts[idx] = updated;
+        } catch (err) {
+          console.error('Failed to update service balance:', err);
+        }
+      }
+      closeModals();
+      renderServiceAccounts();
+      renderDashboard();
+      showToast('Service balances updated');
     });
   }
 
