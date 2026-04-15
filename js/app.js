@@ -950,6 +950,39 @@ const App = (() => {
 
   let _reportDate = new Date();
 
+  const DEFAULT_EXPENSE_CATEGORIES = [
+    'Housing','Food & Dining','Transport','Transport: Fuel',
+    'Transport: Parking & Tolls','Transport: Car Maintenance',
+    'Health','Insurance','Entertainment','Subscriptions',
+    'Shopping','Utilities','Kids','Travel','Savings',
+    'Investments','Work Expenses','Education','Personal Care',
+    'Personal Spending','Transfer','Other',
+  ];
+  const DEFAULT_INCOME_CATEGORIES = [
+    'Salary','Freelance','Rental Income','Investment',
+    'Gift','Reimbursements','Other Income','Transfer',
+  ];
+
+  function getCustomCategories() {
+    try {
+      return JSON.parse(localStorage.getItem('finance_custom_categories') || '{"expense":[],"income":[]}');
+    } catch { return { expense: [], income: [] }; }
+  }
+
+  function saveCustomCategories(custom) {
+    localStorage.setItem('finance_custom_categories', JSON.stringify(custom));
+  }
+
+  function getExpenseCategories() {
+    const custom = getCustomCategories();
+    return [...new Set([...DEFAULT_EXPENSE_CATEGORIES, ...(custom.expense || [])])].sort();
+  }
+
+  function getIncomeCategories() {
+    const custom = getCustomCategories();
+    return [...new Set([...DEFAULT_INCOME_CATEGORIES, ...(custom.income || [])])].sort();
+  }
+
   function categoryIcon(category) {
     const icons = {
       'Housing': '🏠', 'Food & Dining': '🍽️', 'Transport': '🚗',
@@ -963,6 +996,12 @@ const App = (() => {
       'Investment': '📈', 'Gift': '🎁', 'Reimbursements': '🔄', 'Other Income': '💰', 'Other': '📌'
     };
     return icons[category] || '💳';
+  }
+
+  function buildCategoryOptions(type, selected = '') {
+    const cats = type === 'income' ? getIncomeCategories() : getExpenseCategories();
+    return `<option value="">Select category...</option>` +
+      cats.map(c => `<option value="${escHtml(c)}" ${c === selected ? 'selected' : ''}>${categoryIcon(c)} ${escHtml(c)}</option>`).join('');
   }
 
   // ===== Transaction Modal =====
@@ -985,10 +1024,17 @@ const App = (() => {
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         document.getElementById('txn-type').value = btn.dataset.type;
+        updateTransactionCategories(btn.dataset.type);
       });
     });
 
     document.getElementById('form-transaction')?.addEventListener('submit', saveTransaction);
+  }
+
+  function updateTransactionCategories(type, selected = '') {
+    const sel = document.getElementById('txn-category');
+    if (!sel) return;
+    sel.innerHTML = buildCategoryOptions(type, selected);
   }
 
   function openAddTransaction() {
@@ -998,6 +1044,7 @@ const App = (() => {
     document.getElementById('txn-id').value = '';
     document.getElementById('txn-type').value = 'expense';
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.type === 'expense'));
+    updateTransactionCategories('expense');
     setTodayDate();
     updateCurrencySymbols();
     document.getElementById('modal-transaction').classList.remove('hidden');
@@ -1012,7 +1059,7 @@ const App = (() => {
     document.getElementById('txn-type').value = t.type;
     document.getElementById('txn-amount').value = t.amount;
     document.getElementById('txn-description').value = t.description;
-    document.getElementById('txn-category').value = t.category;
+    updateTransactionCategories(t.type, t.category);
     document.getElementById('txn-date').value = t.date;
     document.getElementById('txn-notes').value = t.notes || '';
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.type === t.type));
@@ -1327,6 +1374,7 @@ const App = (() => {
   function openAddBudget() {
     document.getElementById('budget-id').value = '';
     document.getElementById('form-budget').reset();
+    document.getElementById('budget-category').innerHTML = buildCategoryOptions('expense');
     updateCurrencySymbols();
     document.getElementById('modal-budget').classList.remove('hidden');
   }
@@ -1335,7 +1383,7 @@ const App = (() => {
     const b = budgets.find(b => b.id === id);
     if (!b) return;
     document.getElementById('budget-id').value = b.id;
-    document.getElementById('budget-category').value = b.category;
+    document.getElementById('budget-category').innerHTML = buildCategoryOptions('expense', b.category);
     document.getElementById('budget-amount').value = b.amount;
     updateCurrencySymbols();
     document.getElementById('modal-budget').classList.remove('hidden');
@@ -1604,30 +1652,8 @@ const App = (() => {
 
   function updateRecurringCategories(type) {
     const sel = document.getElementById('recurring-category');
-    const expenseOpts = `<option value="">Select category...</option>
-      <option value="Housing">Housing</option>
-      <option value="Mortgage">Mortgage</option>
-      <option value="Rates">Rates</option>
-      <option value="Food & Dining">Food & Dining</option>
-      <option value="Transport">Transport</option>
-      <option value="Health">Health</option>
-      <option value="Entertainment">Entertainment</option>
-      <option value="Shopping">Shopping</option>
-      <option value="Utilities">Utilities</option>
-      <option value="Education">Education</option>
-      <option value="Kids">Kids</option>
-      <option value="Savings">Savings</option>
-      <option value="Personal Care">Personal Care</option>
-      <option value="Other">Other</option>
-      <option value="Transfer">🔁 Transfer</option>`;
-    const incomeOpts = `<option value="">Select category...</option>
-      <option value="Salary">Salary</option>
-      <option value="Rental Income">Rental Income</option>
-      <option value="Freelance">Freelance</option>
-      <option value="Investment">Investment</option>
-      <option value="Other Income">Other Income</option>
-      <option value="Transfer">🔁 Transfer</option>`;
-    sel.innerHTML = type === 'income' ? incomeOpts : expenseOpts;
+    if (!sel) return;
+    sel.innerHTML = buildCategoryOptions(type);
   }
 
   function openAddRecurring() {
@@ -1795,6 +1821,51 @@ const App = (() => {
     DB.getSetting('currency').then(cur => {
       if (cur) document.getElementById('setting-currency').value = cur;
     });
+
+    document.getElementById('btn-add-category')?.addEventListener('click', addCustomCategory);
+    renderCustomCategories();
+  }
+
+  function renderCustomCategories() {
+    const el = document.getElementById('custom-categories-list');
+    if (!el) return;
+    const custom = getCustomCategories();
+    const all = [
+      ...(custom.expense || []).map(c => ({ name: c, type: 'expense' })),
+      ...(custom.income || []).map(c => ({ name: c, type: 'income' })),
+    ];
+    if (all.length === 0) {
+      el.innerHTML = '<p class="muted" style="font-size:13px;">No custom categories yet.</p>';
+      return;
+    }
+    el.innerHTML = all.map(c => `
+      <div class="category-tag">
+        ${categoryIcon(c.name)} ${escHtml(c.name)} <span class="muted">(${c.type})</span>
+        <button class="tag-remove" data-name="${escHtml(c.name)}" data-type="${escHtml(c.type)}">✕</button>
+      </div>
+    `).join('');
+    el.querySelectorAll('.tag-remove').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const cur = getCustomCategories();
+        cur[btn.dataset.type] = (cur[btn.dataset.type] || []).filter(c => c !== btn.dataset.name);
+        saveCustomCategories(cur);
+        renderCustomCategories();
+      });
+    });
+  }
+
+  function addCustomCategory() {
+    const name = document.getElementById('new-category-name')?.value.trim();
+    const type = document.getElementById('new-category-type')?.value;
+    if (!name || !type) return;
+    const custom = getCustomCategories();
+    if (!(custom[type] || []).includes(name)) {
+      custom[type] = [...(custom[type] || []), name];
+      saveCustomCategories(custom);
+    }
+    document.getElementById('new-category-name').value = '';
+    renderCustomCategories();
+    showToast(`Category "${name}" added`);
   }
 
   // ===== Export / Import =====

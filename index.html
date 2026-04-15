@@ -380,6 +380,19 @@
           <p class="hint">Resets all budget categories and line items back to the original spreadsheet values. Any custom changes you've made will be overwritten.</p>
           <button id="btn-load-presets" class="btn-ghost">Reset Budgets to Defaults</button>
         </div>
+        <div class="settings-section">
+          <h3>Custom Categories</h3>
+          <p class="muted">Add custom categories to the expense or income lists.</p>
+          <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+            <input id="new-category-name" type="text" placeholder="Category name" style="flex:1;min-width:160px;">
+            <select id="new-category-type">
+              <option value="expense">Expense</option>
+              <option value="income">Income</option>
+            </select>
+            <button id="btn-add-category" class="btn-primary">Add</button>
+          </div>
+          <div id="custom-categories-list"></div>
+        </div>
       </div>
 
     </main>
@@ -413,37 +426,6 @@
         <label>Category</label>
         <select id="txn-category" required>
           <option value="">Select category...</option>
-          <optgroup label="Expenses">
-            <option value="Housing">🏠 Housing</option>
-            <option value="Food & Dining">🍽️ Food &amp; Dining</option>
-            <option value="Transport: Fuel">⛽ Transport: Fuel</option>
-            <option value="Transport: Parking &amp; Tolls">🅿️ Transport: Parking &amp; Tolls</option>
-            <option value="Transport: Car Maintenance">🔧 Transport: Car Maintenance</option>
-            <option value="Transport">🚗 Transport (general)</option>
-            <option value="Health">💊 Health</option>
-            <option value="Insurance">🛡️ Insurance</option>
-            <option value="Entertainment">🎬 Entertainment</option>
-            <option value="Subscriptions">📱 Subscriptions</option>
-            <option value="Shopping">🛍️ Shopping</option>
-            <option value="Utilities">💡 Utilities</option>
-            <option value="Kids">👶 Kids</option>
-            <option value="Travel">✈️ Travel</option>
-            <option value="Savings">🏦 Savings</option>
-            <option value="Investments">📊 Investments</option>
-            <option value="Work Expenses">🧾 Work Expenses</option>
-            <option value="Education">📚 Education</option>
-            <option value="Personal Care">💇 Personal Care</option>
-            <option value="Other">📌 Other</option>
-          </optgroup>
-          <optgroup label="Income">
-            <option value="Salary">💼 Salary</option>
-            <option value="Freelance">💻 Freelance</option>
-            <option value="Investment">📈 Investment</option>
-            <option value="Gift">🎁 Gift</option>
-            <option value="Rental Income">🏡 Rental Income</option>
-            <option value="Reimbursements">🔄 Reimbursements</option>
-            <option value="Other Income">💰 Other Income</option>
-          </optgroup>
         </select>
 
         <label>Date</label>
@@ -473,27 +455,6 @@
         <label>Category</label>
         <select id="budget-category" required>
           <option value="">Select category...</option>
-          <option value="Housing">🏠 Housing</option>
-          <option value="Food & Dining">🍽️ Food &amp; Dining</option>
-          <option value="Transport: Fuel">⛽ Transport: Fuel</option>
-          <option value="Transport: Parking &amp; Tolls">🅿️ Transport: Parking &amp; Tolls</option>
-          <option value="Transport: Car Maintenance">🔧 Transport: Car Maintenance</option>
-          <option value="Transport">🚗 Transport (general)</option>
-          <option value="Health">💊 Health</option>
-          <option value="Insurance">🛡️ Insurance</option>
-          <option value="Entertainment">🎬 Entertainment</option>
-          <option value="Subscriptions">📱 Subscriptions</option>
-          <option value="Shopping">🛍️ Shopping</option>
-          <option value="Utilities">💡 Utilities</option>
-          <option value="Kids">👶 Kids</option>
-          <option value="Travel">✈️ Travel</option>
-          <option value="Savings">🏦 Savings</option>
-          <option value="Investments">📊 Investments</option>
-          <option value="Work Expenses">🧾 Work Expenses</option>
-          <option value="Education">📚 Education</option>
-          <option value="Personal Care">💇 Personal Care</option>
-          <option value="Personal Spending">🎉 Personal Spending</option>
-          <option value="Other">📌 Other</option>
         </select>
 
         <label>Monthly Limit</label>
@@ -593,39 +554,6 @@
         <label>Category</label>
         <select id="recurring-category" required>
           <option value="">Select category...</option>
-          <optgroup label="Expenses">
-            <option value="Housing">Housing</option>
-            <option value="Mortgage">Mortgage</option>
-            <option value="Rates">Rates</option>
-            <option value="Food & Dining">🍽️ Food &amp; Dining</option>
-            <option value="Transport: Fuel">⛽ Transport: Fuel</option>
-            <option value="Transport: Parking &amp; Tolls">🅿️ Transport: Parking &amp; Tolls</option>
-            <option value="Transport: Car Maintenance">🔧 Transport: Car Maintenance</option>
-            <option value="Transport">🚗 Transport (general)</option>
-            <option value="Health">💊 Health</option>
-            <option value="Insurance">🛡️ Insurance</option>
-            <option value="Entertainment">🎬 Entertainment</option>
-            <option value="Subscriptions">📱 Subscriptions</option>
-            <option value="Shopping">🛍️ Shopping</option>
-            <option value="Utilities">💡 Utilities</option>
-            <option value="Education">📚 Education</option>
-            <option value="Kids">👶 Kids</option>
-            <option value="Travel">✈️ Travel</option>
-            <option value="Savings">🏦 Savings</option>
-            <option value="Investments">📊 Investments</option>
-            <option value="Work Expenses">🧾 Work Expenses</option>
-            <option value="Personal Care">💇 Personal Care</option>
-            <option value="Other">📌 Other</option>
-          </optgroup>
-          <optgroup label="Income">
-            <option value="Salary">💼 Salary</option>
-            <option value="Freelance">💻 Freelance</option>
-            <option value="Investment">📈 Investment</option>
-            <option value="Gift">🎁 Gift</option>
-            <option value="Rental Income">🏡 Rental Income</option>
-            <option value="Reimbursements">🔄 Reimbursements</option>
-            <option value="Other Income">💰 Other Income</option>
-          </optgroup>
         </select>
 
         <label>Frequency</label>
