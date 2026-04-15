@@ -4,14 +4,14 @@ const CSVImport = (() => {
   const ANZ_OWN = ['01-0902'];
 
   const EXP_CATS = [
-    'Housing', 'Food & Dining',
-    'Transport: Fuel', 'Transport: Parking & Tolls', 'Transport: Car Maintenance',
+    'Housing', 'Mortgage', 'Rates', 'Food & Dining',
+    'Transport', 'Transport: Fuel', 'Transport: Parking & Tolls', 'Transport: Car Maintenance',
     'Health', 'Insurance', 'Entertainment', 'Subscriptions',
     'Shopping', 'Utilities', 'Kids', 'Travel',
     'Savings', 'Investments', 'Work Expenses',
-    'Education', 'Personal Care', 'Other'
+    'Education', 'Personal Care', 'Personal Spending', 'Transfer', 'Other'
   ];
-  const INC_CATS = ['Salary', 'Freelance', 'Investment', 'Gift', 'Rental Income', 'Reimbursements', 'Other Income'];
+  const INC_CATS = ['Salary', 'Freelance', 'Rental Income', 'Investment', 'Gift', 'Reimbursements', 'Other Income', 'Transfer'];
 
   // ===== CSV parsing =====
 

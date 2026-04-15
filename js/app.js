@@ -2295,13 +2295,13 @@ const App = (() => {
 
     btn.disabled = false;
     closeModals();
-    refreshCurrentPage();
     const txnMsg = count > 0 ? `Imported ${count} transaction${count !== 1 ? 's' : ''}` : 'No new transactions';
     const balanceMsg = balancesUpdated > 0 ? ` · ${balancesUpdated} balance${balancesUpdated !== 1 ? 's' : ''} updated` : '';
     const patchMsg = accountsPatched > 0 ? ` · ${accountsPatched} account link${accountsPatched !== 1 ? 's' : ''} fixed` : '';
     const transfersLabelled = await silentlyLabelTransfers();
     const transferMsg = transfersLabelled > 0 ? ` · ${transfersLabelled} transfer${transfersLabelled !== 1 ? 's' : ''} labelled` : '';
     showToast(`${txnMsg}${balanceMsg}${patchMsg}${transferMsg}`);
+    refreshCurrentPage();
     _importRows = [];
     _csvFiles = [];
     if (serviceAccounts.length > 0) {

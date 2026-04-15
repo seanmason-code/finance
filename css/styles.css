@@ -1202,7 +1202,7 @@ body {
   .charts-grid {
     grid-template-columns: 1fr;
   }
-  .modal {
+  .modal-box {
     margin: 8px;
     padding: 20px 16px;
     max-height: 90vh;
