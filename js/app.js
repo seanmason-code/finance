@@ -351,6 +351,19 @@ const App = (() => {
     const now = new Date();
     const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
+    // DEBUG: show matching status for each account
+    const debugEl = document.getElementById('accounts-debug');
+    if (debugEl) {
+      const txnIds = [...new Set(transactions.map(t => t.account).filter(Boolean))].sort();
+      const accountRows = accounts.map(a => {
+        const normA = normAccNum(a.account_number);
+        const matched = txnIds.some(id => normAccNum(id) === normA);
+        return `<div><strong>${escHtml(a.name)}</strong> — stored: <code>${escHtml(a.account_number || '(none)')}</code> — ${matched ? '✅ matched' : '❌ no match'}</div>`;
+      }).join('');
+      const txnIdList = txnIds.map(id => `<code>${escHtml(id)}</code>`).join('  ');
+      debugEl.innerHTML = `<strong>Account IDs in transactions:</strong> ${txnIdList || '(none)'}<br><br><strong>Your accounts:</strong><br>${accountRows || '(none set up)'}`;
+    }
+
     const totalBalance = accounts.reduce((s, a) => s + (a.balance || 0), 0);
     const monthIncome = transactions.filter(t => t.type === 'income' && t.category !== 'Transfer' && t.date.startsWith(thisMonth)).reduce((s, t) => s + t.amount, 0);
     const monthExpense = transactions.filter(t => t.type === 'expense' && t.category !== 'Transfer' && t.date.startsWith(thisMonth)).reduce((s, t) => s + t.amount, 0);
