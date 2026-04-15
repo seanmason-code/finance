@@ -1777,12 +1777,6 @@ const App = (() => {
 
   async function doImport() {
     const toImport = _importRows.filter(r => r._checked);
-
-    if (toImport.length === 0) {
-      alert('No transactions selected.');
-      return;
-    }
-
     const btn = document.getElementById('import-confirm-btn');
     btn.textContent = 'Importing...';
     btn.disabled = true;
@@ -1807,10 +1801,11 @@ const App = (() => {
       } catch (err) {
         console.error('Import row failed:', err);
       }
-      btn.textContent = `Importing... ${Math.round((count / total) * 100)}%`;
+      if (total > 0) btn.textContent = `Importing... ${Math.round((count / total) * 100)}%`;
     }
 
-    // Update account balances from closing balance in CSV
+    // Update account balances from closing balance in CSV (runs even if all duplicates)
+    btn.textContent = 'Updating balances...';
     const lastBalances = CSVImport.getLastBalances(_importRows);
     let balancesUpdated = 0;
     for (const [accountNumber, balance] of Object.entries(lastBalances)) {
@@ -1831,8 +1826,9 @@ const App = (() => {
     btn.disabled = false;
     closeModals();
     refreshCurrentPage();
+    const txnMsg = count > 0 ? `Imported ${count} transaction${count !== 1 ? 's' : ''}` : 'No new transactions';
     const balanceMsg = balancesUpdated > 0 ? ` · ${balancesUpdated} account balance${balancesUpdated !== 1 ? 's' : ''} updated` : '';
-    showToast(`Imported ${count} transaction${count !== 1 ? 's' : ''}${balanceMsg}`);
+    showToast(`${txnMsg}${balanceMsg}`);
     _importRows = [];
     _csvFiles = [];
   }
