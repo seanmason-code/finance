@@ -4,8 +4,11 @@ const CSVImport = (() => {
   const ANZ_OWN = ['01-0902'];
 
   const EXP_CATS = [
-    'Housing', 'Food & Dining', 'Transport: Fuel', 'Transport: Parking & Tolls', 'Transport: Car Maintenance',
-    'Health', 'Entertainment', 'Shopping', 'Utilities', 'Kids',
+    'Housing', 'Food & Dining',
+    'Transport: Fuel', 'Transport: Parking & Tolls', 'Transport: Car Maintenance',
+    'Health', 'Insurance', 'Entertainment', 'Subscriptions',
+    'Shopping', 'Utilities', 'Kids', 'Travel',
+    'Savings', 'Investments', 'Work Expenses',
     'Education', 'Personal Care', 'Other'
   ];
   const INC_CATS = ['Salary', 'Freelance', 'Investment', 'Gift', 'Rental Income', 'Other Income'];
@@ -167,9 +170,10 @@ const CSVImport = (() => {
 
     // Groceries / supermarkets
     if (/PAK.?N.?SAVE|COUNTDOWN|WOOLWORTH|NEW WORLD|FRESH CHOICE|FOUR SQUARE|SUPERETTE|VEGETA/.test(d)) return 'Food & Dining';
-    // Cafes, restaurants, takeaways
-    if (/CAFE|COFFEE|LUNCHBAR|SUSHI|RESTAURANT|PIZZA|BURGER|BAKERY|TAKEAWAY|KFC|MCDONALD|SUBWAY|DOMINO|NOODLE|CHICKEN|CHIP.?SHOP|UBER.*EAT|UBEREATS|BISTRO|EATERY|DINER|GRILL/.test(d)) return 'Food & Dining';
+    // Cafes, restaurants, takeaways, food delivery, alcohol
+    if (/CAFE|COFFEE|LUNCHBAR|SUSHI|RESTAURANT|PIZZA|BURGER|BAKERY|TAKEAWAY|KFC|MCDONALD|SUBWAY|DOMINO|NOODLE|CHICKEN|CHIP.?SHOP|UBER.*EAT|UBEREATS|DOORDASH|MENULOG|DELIVEREASY|BISTRO|EATERY|DINER|GRILL/.test(d)) return 'Food & Dining';
     if (/\bBAR\b/.test(d)) return 'Food & Dining';
+    if (/LIQUORLAND|SUPER LIQUOR|BWS|GLENGARRY|BOTTLE.?O\b|NZWINE/.test(d)) return 'Food & Dining';
     // Transport subcategories
     if (/\bBP\b|BP 2GO|\bZ \b|Z ENERGY|\bMOBIL\b|GULL|CALTEX|WAITOMO|PETROL|FUEL/.test(d)) return 'Transport: Fuel';
     if (/PARK(M?ATE|ING|\s)|WILSON P|AT HOP|AUCKLAND TRANSPORT|AKLD TRANSPORT|FERRY|TRAIN|BUS TICKET/.test(d)) return 'Transport: Parking & Tolls';
@@ -180,18 +184,35 @@ const CSVImport = (() => {
     // Utilities
     if (/POWER|ELECTRICITY|CONTACT ENERGY|MERIDIAN|GENESIS|VECTOR|WATER SUPPLY|BROADBAND|INTERNET/.test(d)) return 'Utilities';
     if (/\bSPARK\b|VODAFONE|2DEGREES|ONE NZ|ORCON|SKINNY|SLINGSHOT|KIWIBANK.*BILLS|BILLS.*KIWIBANK/.test(d)) return 'Utilities';
+    // Insurance (before Health to catch health insurers like Southern Cross)
+    if (/\bTOWER\b|VERO|STATE INS|AMI INS|\bAMI\b|AA INS|AA INSURANCE|NIB |PARTNERS LIFE|CIGNA|FIDELITY LIFE|ASTERON|PINNACLE LIFE/.test(d)) return 'Insurance';
     // Health
-    if (/PHARMACY|CHEMIST|DOCTOR|MEDICAL|HEALTH|DENTAL|OPTOM|VISION|HOSPITAL|PHYSIO|CLINIC/.test(d)) return 'Health';
-    // Entertainment
-    if (/NETFLIX|SPOTIFY|DISNEY|AMAZON PRIME|PRIME VIDEO|GAMING|STEAM|CINEMA|MOVIES|THEATRE|CONCERT|SKY TV|NEON/.test(d)) return 'Entertainment';
-    // Shopping
+    if (/PHARMACY|CHEMIST|DOCTOR|MEDICAL|HEALTH|DENTAL|OPTOM|VISION|HOSPITAL|PHYSIO|CLINIC|SOUTHERN CROSS|AIA |SNAP FIT|FLEX FIT|GYM|FITNESS|TRAINING PEAK|SPORTS LAB/.test(d)) return 'Health';
+    // Entertainment (streaming)
+    if (/NETFLIX|SPOTIFY|DISNEY|AMAZON PRIME|PRIME VIDEO|STEAM|CINEMA|MOVIES|THEATRE|CONCERT|SKY TV|NEON/.test(d)) return 'Entertainment';
+    // Subscriptions (non-entertainment software/services)
+    if (/\bAPPLE\.COM\b|APPLE\.COM\/BILL|ICLOUD|APPLE STORAGE/.test(d)) return 'Subscriptions';
+    if (/GOOGLE.*STORAGE|GOOGLE ONE|GOOGLE.*PLAY|YOUTUBE PREMIUM/.test(d)) return 'Subscriptions';
+    if (/ADOBE|MICROSOFT|OFFICE 365|DROPBOX|CANVA|1PASSWORD|LASTPASS|ZOOM|ATLASSIAN|GITHUB/.test(d)) return 'Subscriptions';
+    // Travel & accommodation
+    if (/AIR NEW ZEALAND|AIR NZ|AIRNZ|JETSTAR|QANTAS|VIRGIN AUST/.test(d)) return 'Travel';
+    if (/AIRBNB|BOOKING\.COM|EXPEDIA|WOTIF|TRIVAGO|\bHOTEL\b|\bMOTEL\b|ACCOMMODATION|HOSTEL/.test(d)) return 'Travel';
+    // Shopping (online + physical retail)
     if (/WAREHOUSE|KMART|FARMERS|MITRE|BUNNINGS|TRADEME/.test(d)) return 'Shopping';
-    // Kids
+    if (/\bAMAZON\b|MIGHTY APE|THE ICONIC|ALIEXPRESS|\bEBAY\b/.test(d)) return 'Shopping';
+    // Investments (outgoing — KiwiSaver top-ups, share platforms)
+    if (/SIMPLICITY|SHARESIES|INVESTNOW|KERNEL|SMARTSHARES|KIWISAVER|TERM DEPOSIT|KIWIWEALTH/.test(d)) return 'Investments';
+    // Savings transfers
+    if (/SAVINGS TRANSFER|TRANSFER.*SAVING|SAVING.*TRANSFER/.test(d)) return 'Savings';
+    // Kids (incl. childcare & daycare)
     if (/SWIMMING|SWIM LESSON|REMUERA|KINDO|SCHOOL FEE|UNIFORM|SKIDS|APPLES|GAMEDAYNZ/.test(d)) return 'Kids';
+    if (/CHILDCARE|DAYCARE|CRECHE|KINDY|KINDERGARTEN|KOHANGA|EARLY CHILDHOOD|EDUCARE|ECE /.test(d)) return 'Kids';
     // Education
     if (/SCHOOL|UNIVERSIT|COURSE|STATIONERY|WHITCO/.test(d)) return 'Education';
+    // Work expenses
+    if (/OFFICEMAX|OFFICE MAX|OFFICEWORKS|STAPLES|WORK EXPENSE/.test(d)) return 'Work Expenses';
     // Personal Care
-    if (/HAIR|BEAUTY|NAIL|GYM|FITNESS|SALON|MASSAGE|SPA/.test(d)) return 'Personal Care';
+    if (/HAIR|BEAUTY|NAIL|SALON|MASSAGE|SPA/.test(d)) return 'Personal Care';
 
     return 'Other';
   }

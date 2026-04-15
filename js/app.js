@@ -662,8 +662,10 @@ const App = (() => {
     const icons = {
       'Housing': '🏠', 'Food & Dining': '🍽️', 'Transport': '🚗',
       'Transport: Fuel': '⛽', 'Transport: Parking & Tolls': '🅿️', 'Transport: Car Maintenance': '🔧',
-      'Health': '💊', 'Entertainment': '🎬', 'Shopping': '🛍️', 'Utilities': '💡', 'Kids': '👶',
-      'Education': '📚', 'Personal Care': '💇', 'Savings': '🏦', 'Personal Spending': '🎉',
+      'Health': '💊', 'Insurance': '🛡️', 'Entertainment': '🎬', 'Subscriptions': '📱',
+      'Shopping': '🛍️', 'Utilities': '💡', 'Kids': '👶', 'Travel': '✈️',
+      'Savings': '🏦', 'Investments': '📊', 'Work Expenses': '🧾',
+      'Education': '📚', 'Personal Care': '💇', 'Personal Spending': '🎉',
       'Transfer': '🔁',
       'Salary': '💼', 'Freelance': '💻', 'Rental Income': '🏡',
       'Investment': '📈', 'Gift': '🎁', 'Other Income': '💰', 'Other': '📌'
