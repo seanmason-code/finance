@@ -776,15 +776,18 @@
   </div>
 
   <!-- Assign Accounts Modal -->
-  <div id="modal-assign-accounts" class="modal-backdrop hidden">
-    <div class="modal" style="max-width:640px;max-height:80vh;overflow-y:auto;">
-      <button class="modal-close">✕</button>
-      <h2>Assign Accounts to Transactions</h2>
-      <p class="muted">These transactions aren't linked to any account. Select an account for each one.</p>
-      <div id="assign-accounts-list"></div>
+  <div id="modal-assign-accounts" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2>Assign Accounts to Transactions</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <p class="hint" style="margin-bottom:12px;">These transactions aren't linked to any account. Select an account for each one.</p>
+      <div id="assign-accounts-list" style="max-height:340px;overflow-y:auto;"></div>
       <div class="modal-actions" style="margin-top:16px;">
-        <button class="btn-primary" id="btn-save-assigned-accounts">Save</button>
-        <button class="btn-ghost modal-close-btn">Cancel</button>
+        <button type="button" class="btn-ghost modal-close-btn">Cancel</button>
+        <button type="button" class="btn-primary" id="btn-save-assigned-accounts">Save</button>
       </div>
     </div>
   </div>

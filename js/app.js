@@ -453,7 +453,7 @@ const App = (() => {
     const listEl = document.getElementById('assign-accounts-list');
     const accountOpts = accounts
       .filter(a => a.type !== 'service')
-      .map(a => `<option value="${escHtml(a.account_number)}">${escHtml(a.name)}</option>`)
+      .map(a => `<option value="${a.account_number ?? ''}">${escHtml(a.name)}</option>`)
       .join('');
 
     listEl.innerHTML = unmatched.slice(0, 50).map(t => `
