@@ -2062,6 +2062,9 @@ const App = (() => {
     showToast(`${txnMsg}${balanceMsg}`);
     _importRows = [];
     _csvFiles = [];
+    if (serviceAccounts.length > 0) {
+      setTimeout(() => showServiceBalancePrompt(), 400);
+    }
   }
 
   // ===== Helpers =====
