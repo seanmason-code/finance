@@ -1564,3 +1564,34 @@ body {
 
 /* Service account card */
 .account-card-balance-updated { font-size: 11px; color: var(--text2); margin-top: 2px; }
+
+/* Unmatched banner + assign modal */
+.unmatched-banner {
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 8px;
+  padding: 10px 16px;
+  margin-bottom: 16px;
+  color: #f59e0b;
+  font-size: 14px;
+}
+.unmatched-banner .link-btn {
+  background: none;
+  border: none;
+  color: #6c63ff;
+  cursor: pointer;
+  text-decoration: underline;
+  font-size: 14px;
+  padding: 0;
+}
+.assign-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  gap: 12px;
+}
+.assign-desc { flex: 1; font-size: 13px; }
+.assign-desc small { color: var(--text-muted); margin-left: 6px; }
+.assign-select { background: var(--surface2); color: var(--text); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 4px 8px; font-size: 13px; }

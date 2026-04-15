@@ -190,6 +190,7 @@
         </header>
         <div id="accounts-total-card"></div>
         <div id="accounts-debug" style="margin:12px 0;padding:12px;background:var(--surface2,#1e1e2e);border-radius:8px;font-size:13px;color:var(--text2,#aaa);line-height:1.8"></div>
+        <div id="accounts-unmatched"></div>
         <div id="accounts-list"></div>
 
         <header class="page-header" style="margin-top:32px">
@@ -770,6 +771,20 @@
       <div class="modal-actions" style="margin-top:20px">
         <button type="button" class="btn-ghost modal-close-btn">Skip all</button>
         <button type="button" id="btn-save-service-balances" class="btn-primary">Save balances</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Assign Accounts Modal -->
+  <div id="modal-assign-accounts" class="modal-backdrop hidden">
+    <div class="modal" style="max-width:640px;max-height:80vh;overflow-y:auto;">
+      <button class="modal-close">✕</button>
+      <h2>Assign Accounts to Transactions</h2>
+      <p class="muted">These transactions aren't linked to any account. Select an account for each one.</p>
+      <div id="assign-accounts-list"></div>
+      <div class="modal-actions" style="margin-top:16px;">
+        <button class="btn-primary" id="btn-save-assigned-accounts">Save</button>
+        <button class="btn-ghost modal-close-btn">Cancel</button>
       </div>
     </div>
   </div>

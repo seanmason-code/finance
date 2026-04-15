@@ -343,6 +343,16 @@ const App = (() => {
 
   function normAccNum(s) { return (s || '').replace(/[\s\-]/g, '').toLowerCase(); }
 
+  function accNumMatches(storedNum, txnAccount) {
+    if (!storedNum || !txnAccount) return false;
+    const norm = normAccNum(storedNum);
+    const txn = normAccNum(txnAccount);
+    if (norm === txn) return true;
+    if (norm.length >= 8 && txn.includes(norm)) return true;
+    if (txn.length >= 8 && norm.includes(txn)) return true;
+    return false;
+  }
+
   function renderAccounts() {
     const totalEl = document.getElementById('accounts-total-card');
     const listEl = document.getElementById('accounts-list');
@@ -356,12 +366,24 @@ const App = (() => {
     if (debugEl) {
       const txnIds = [...new Set(transactions.map(t => t.account).filter(Boolean))].sort();
       const accountRows = accounts.map(a => {
-        const normA = normAccNum(a.account_number);
-        const matched = txnIds.some(id => normAccNum(id) === normA);
+        const matched = txnIds.some(id => accNumMatches(a.account_number, id));
         return `<div><strong>${escHtml(a.name)}</strong> — stored: <code>${escHtml(a.account_number || '(none)')}</code> — ${matched ? '✅ matched' : '❌ no match'}</div>`;
       }).join('');
       const txnIdList = txnIds.map(id => `<code>${escHtml(id)}</code>`).join('  ');
       debugEl.innerHTML = `<strong>Account IDs in transactions:</strong> ${txnIdList || '(none)'}<br><br><strong>Your accounts:</strong><br>${accountRows || '(none set up)'}`;
+    }
+
+    // Unmatched count banner
+    const unmatchedEl = document.getElementById('accounts-unmatched');
+    if (unmatchedEl) {
+      const unmatched = transactions.filter(t => {
+        if (!t.account) return true;
+        return !accounts.some(a => accNumMatches(a.account_number, t.account));
+      });
+      unmatchedEl.innerHTML = unmatched.length > 0
+        ? `<div class="unmatched-banner">⚠️ ${unmatched.length} transaction${unmatched.length !== 1 ? 's' : ''} not linked to an account — <button class="link-btn" id="btn-assign-accounts">Assign now</button></div>`
+        : '';
+      document.getElementById('btn-assign-accounts')?.addEventListener('click', openAssignAccountsModal);
     }
 
     const totalBalance = accounts.reduce((s, a) => s + (a.balance || 0), 0);
@@ -421,6 +443,59 @@ const App = (() => {
     });
   }
 
+  function openAssignAccountsModal() {
+    const unmatched = transactions.filter(t => {
+      if (!t.account) return true;
+      return !accounts.some(a => accNumMatches(a.account_number, t.account));
+    });
+    const modal = document.getElementById('modal-assign-accounts');
+    if (!modal) return;
+    const listEl = document.getElementById('assign-accounts-list');
+    const accountOpts = accounts
+      .filter(a => a.type !== 'service')
+      .map(a => `<option value="${escHtml(a.account_number)}">${escHtml(a.name)}</option>`)
+      .join('');
+
+    listEl.innerHTML = unmatched.slice(0, 50).map(t => `
+      <div class="assign-row" data-id="${escHtml(t.id)}">
+        <span class="assign-desc">${escHtml(t.description || '')} <small>${escHtml(t.date || '')}</small></span>
+        <select class="assign-select" data-id="${escHtml(t.id)}">
+          <option value="">— skip —</option>
+          ${accountOpts}
+        </select>
+      </div>
+    `).join('');
+
+    if (unmatched.length > 50) {
+      listEl.innerHTML += `<p class="muted">Showing first 50 of ${unmatched.length}. Run again after saving to handle more.</p>`;
+    }
+    modal.classList.remove('hidden');
+  }
+
+  async function saveAssignedAccounts() {
+    const rows = document.querySelectorAll('#assign-accounts-list .assign-row');
+    let updated = 0;
+    for (const row of rows) {
+      const id = row.dataset.id;
+      const sel = row.querySelector('.assign-select');
+      if (!sel || !sel.value) continue;
+      const txn = transactions.find(t => t.id === id);
+      if (!txn) continue;
+      const updatedTxn = { ...txn, account: sel.value };
+      try {
+        await SB.upsertTransaction(updatedTxn);
+        const idx = transactions.findIndex(t => t.id === id);
+        if (idx !== -1) transactions[idx] = updatedTxn;
+        updated++;
+      } catch (err) {
+        console.error('Failed to assign account:', err);
+      }
+    }
+    closeModals();
+    refreshCurrentPage();
+    showToast(`${updated} transaction${updated !== 1 ? 's' : ''} linked to accounts`);
+  }
+
   function serviceAccountCardHTML(a) {
     const color = a.color || '#6c63ff';
     const balance = a.balance || 0;
@@ -452,8 +527,7 @@ const App = (() => {
   function accountCardHTML(a, thisMonth) {
     const color = a.color || '#6c63ff';
     const icon = BANK_ICONS[a.bank] || '💳';
-    const normA = normAccNum(a.account_number);
-    const txns = transactions.filter(t => t.account && normA && normAccNum(t.account) === normA && t.date.startsWith(thisMonth));
+    const txns = transactions.filter(t => t.account && accNumMatches(a.account_number, t.account) && t.date.startsWith(thisMonth));
     const monthIn = txns.filter(t => t.type === 'income' && t.category !== 'Transfer').reduce((s, t) => s + t.amount, 0);
     const monthOut = txns.filter(t => t.type === 'expense' && t.category !== 'Transfer').reduce((s, t) => s + t.amount, 0);
 
@@ -1727,6 +1801,7 @@ const App = (() => {
   function bindExportImport() {
     document.getElementById('btn-export')?.addEventListener('click', exportData);
     document.getElementById('btn-export-csv')?.addEventListener('click', exportCSV);
+    document.getElementById('btn-save-assigned-accounts')?.addEventListener('click', saveAssignedAccounts);
     document.getElementById('btn-import')?.addEventListener('click', () => {
       document.getElementById('import-file').click();
     });
