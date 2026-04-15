@@ -11,7 +11,7 @@ const CSVImport = (() => {
     'Savings', 'Investments', 'Work Expenses',
     'Education', 'Personal Care', 'Other'
   ];
-  const INC_CATS = ['Salary', 'Freelance', 'Investment', 'Gift', 'Rental Income', 'Other Income'];
+  const INC_CATS = ['Salary', 'Freelance', 'Investment', 'Gift', 'Rental Income', 'Reimbursements', 'Other Income'];
 
   // ===== CSV parsing =====
 
@@ -163,6 +163,7 @@ const CSVImport = (() => {
       if (/WAGES|SALARY|PAYROLL/.test(d)) return 'Salary';
       if (/INTEREST/.test(d)) return 'Investment';
       if (/RENT|RENTAL|ANEMAX/.test(d)) return 'Rental Income';
+      if (/UNIMED|UNI.MED|REIMBURSE|REIMBURSEMENT|SOUTHERN CROSS/.test(d)) return 'Reimbursements';
       if (/HOLIDAY.*PAYOUT|PAYOUT.*HOLIDAY/.test(d)) return 'Other Income';
       if (txType === 'DIRECT CREDIT' || txType === 'Direct Credit') return 'Salary';
       return 'Other Income';

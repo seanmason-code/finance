@@ -668,7 +668,7 @@ const App = (() => {
       'Education': '📚', 'Personal Care': '💇', 'Personal Spending': '🎉',
       'Transfer': '🔁',
       'Salary': '💼', 'Freelance': '💻', 'Rental Income': '🏡',
-      'Investment': '📈', 'Gift': '🎁', 'Other Income': '💰', 'Other': '📌'
+      'Investment': '📈', 'Gift': '🎁', 'Reimbursements': '🔄', 'Other Income': '💰', 'Other': '📌'
     };
     return icons[category] || '💳';
   }
