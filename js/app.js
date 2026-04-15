@@ -3,7 +3,8 @@ const App = (() => {
   let transactions = [];
   let budgets = [];
   let recurring = [];
-  let accounts = [];
+  let accounts = [];        // bank accounts (bank !== 'Service')
+  let serviceAccounts = []; // service provider balances (bank === 'Service')
   let currency = 'NZD';
   let chatHistory = [];
   let editingTxnId = null;
@@ -125,13 +126,16 @@ const App = (() => {
       transactions = await SB.getTransactions();
       budgets = await SB.getBudgets();
       recurring = await SB.getRecurring();
-      accounts = await SB.getAccounts().catch(() => []);
+      const allAccounts = await SB.getAccounts().catch(() => []);
+      accounts = allAccounts.filter(a => a.bank !== 'Service');
+      serviceAccounts = allAccounts.filter(a => a.bank === 'Service');
     } catch (err) {
       console.error('Failed to load data:', err);
       transactions = [];
       budgets = [];
       recurring = [];
       accounts = [];
+      serviceAccounts = [];
     }
 
     // Auto-seed budgets on first use if none exist
