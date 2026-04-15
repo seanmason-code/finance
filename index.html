@@ -656,8 +656,9 @@
           <option value="Sean">Sean</option>
           <option value="Partner">Partner</option>
         </select>
-        <label>Account Number <span class="hint-inline">(used to match CSV imports)</span></label>
-        <input type="text" id="account-number" placeholder="e.g. 01-0902-1234567-00" />
+        <label>Account Number <span class="hint-inline">(must match your imported CSV data — pick from the list)</span></label>
+        <input type="text" id="account-number" placeholder="e.g. 01-0902-1234567-00" list="account-number-list" autocomplete="off" />
+        <datalist id="account-number-list"></datalist>
         <label>Current Balance</label>
         <div class="amount-input">
           <span class="currency-symbol">$</span>

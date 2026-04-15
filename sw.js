@@ -1,4 +1,4 @@
-const CACHE = 'finance-v1';
+const CACHE = 'finance-v2';
 const ASSETS = ['/', '/index.html', '/css/styles.css', '/js/db.js', '/js/charts.js', '/js/ai.js', '/js/app.js'];
 
 self.addEventListener('install', e => {

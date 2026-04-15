@@ -302,6 +302,8 @@ const App = (() => {
   const ACCOUNT_COLORS = ['#6c63ff','#22c55e','#3b82f6','#f59e0b','#ef4444','#ec4899','#14b8a6','#8b5cf6'];
   const BANK_ICONS = { ANZ: '🏦', Kiwibank: '🥝', Westpac: '🔴', BNZ: '🟠', ASB: '🏧', Other: '💳' };
 
+  function normAccNum(s) { return (s || '').replace(/[\s\-]/g, '').toLowerCase(); }
+
   function renderAccounts() {
     const totalEl = document.getElementById('accounts-total-card');
     const listEl = document.getElementById('accounts-list');
@@ -353,7 +355,8 @@ const App = (() => {
   function accountCardHTML(a, thisMonth) {
     const color = a.color || '#6c63ff';
     const icon = BANK_ICONS[a.bank] || '💳';
-    const txns = transactions.filter(t => t.account && t.account === a.account_number && t.date.startsWith(thisMonth));
+    const normA = normAccNum(a.account_number);
+    const txns = transactions.filter(t => t.account && normA && normAccNum(t.account) === normA && t.date.startsWith(thisMonth));
     const monthIn = txns.filter(t => t.type === 'income' && t.category !== 'Transfer').reduce((s, t) => s + t.amount, 0);
     const monthOut = txns.filter(t => t.type === 'expense' && t.category !== 'Transfer').reduce((s, t) => s + t.amount, 0);
 
@@ -387,6 +390,13 @@ const App = (() => {
       </div>`;
   }
 
+  function populateAccountNumberList() {
+    const datalist = document.getElementById('account-number-list');
+    if (!datalist) return;
+    const distinct = [...new Set(transactions.map(t => t.account).filter(Boolean))].sort();
+    datalist.innerHTML = distinct.map(v => `<option value="${escHtml(v)}">`).join('');
+  }
+
   function openAddAccount() {
     document.getElementById('modal-account-title').textContent = 'Add Account';
     document.getElementById('form-account').reset();
@@ -394,6 +404,7 @@ const App = (() => {
     document.getElementById('account-color').value = '#6c63ff';
     document.getElementById('btn-delete-account').style.display = 'none';
     renderColorPicker('#6c63ff');
+    populateAccountNumberList();
     document.getElementById('modal-account').classList.remove('hidden');
   }
 
@@ -410,6 +421,7 @@ const App = (() => {
     document.getElementById('account-color').value = a.color || '#6c63ff';
     document.getElementById('btn-delete-account').style.display = 'inline-flex';
     renderColorPicker(a.color || '#6c63ff');
+    populateAccountNumberList();
     document.getElementById('modal-account').classList.remove('hidden');
   }
 
