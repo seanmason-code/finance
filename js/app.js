@@ -1726,7 +1726,7 @@ const App = (() => {
   // ===== Export / Import =====
   function bindExportImport() {
     document.getElementById('btn-export')?.addEventListener('click', exportData);
-  document.getElementById('btn-export-csv')?.addEventListener('click', exportCSV);
+    document.getElementById('btn-export-csv')?.addEventListener('click', exportCSV);
     document.getElementById('btn-import')?.addEventListener('click', () => {
       document.getElementById('import-file').click();
     });
@@ -1748,15 +1748,20 @@ const App = (() => {
   }
 
   function exportCSV() {
+    function csvEscape(val) {
+      const s = String(val ?? '');
+      return s.includes(',') || s.includes('"') || s.includes('\n')
+        ? `"${s.replace(/"/g, '""')}"` : s;
+    }
     const headers = ['date', 'description', 'amount', 'type', 'category', 'account', 'notes'];
     const rows = transactions.map(t => [
-      t.date || '',
-      `"${(t.description || '').replace(/"/g, '""')}"`,
-      t.type === 'expense' ? `-${t.amount}` : t.amount,
-      t.type || '',
-      t.category || '',
-      t.account || '',
-      `"${(t.notes || '').replace(/"/g, '""')}"`,
+      csvEscape(t.date || ''),
+      csvEscape(t.description || ''),
+      t.type === 'expense' ? `-${t.amount}` : (t.amount || ''),
+      csvEscape(t.type || ''),
+      csvEscape(t.category || ''),
+      csvEscape(t.account || ''),
+      csvEscape(t.notes || ''),
     ]);
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
