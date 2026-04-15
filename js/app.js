@@ -250,6 +250,7 @@ const App = (() => {
     if (netWk) netWk.textContent = `${formatCurrency(net * 12 / 52)}/wk`;
 
     renderPaceCard();
+    renderNetPosition();
     Charts.renderCategoryChart(monthTxns);
     Charts.renderTimelineChart(transactions);
     renderRecentTransactions();
@@ -286,6 +287,39 @@ const App = (() => {
     if (!ahead) {
       document.getElementById('btn-pace-drill')?.addEventListener('click', () => navigateTo('reports'));
     }
+  }
+
+  function renderNetPosition() {
+    const card = document.getElementById('net-position-card');
+    if (!card) return;
+
+    const bankTotal = accounts.reduce((s, a) => s + (a.balance || 0), 0);
+    const serviceTotal = serviceAccounts.reduce((s, a) => s + (a.balance || 0), 0);
+    const netTotal = bankTotal + serviceTotal;
+    const netColor = netTotal >= 0 ? 'var(--green)' : 'var(--red)';
+
+    // Hide if no data at all
+    if (accounts.length === 0 && serviceAccounts.length === 0) { card.innerHTML = ''; return; }
+
+    card.innerHTML = `
+      <div class="net-position-inner">
+        <div class="net-position-title">💰 Net Position</div>
+        <div class="net-position-rows">
+          <div class="net-position-row">
+            <span>Bank accounts</span>
+            <span>${formatCurrency(bankTotal)}</span>
+          </div>
+          <div class="net-position-row">
+            <span>Service credits</span>
+            <span style="color:${serviceTotal >= 0 ? 'var(--green)' : 'var(--red)'}">${formatCurrency(serviceTotal)}</span>
+          </div>
+          <div class="net-position-row net-position-total">
+            <span>Total net position</span>
+            <span style="color:${netColor}">${formatCurrency(netTotal)}</span>
+          </div>
+        </div>
+      </div>
+    `;
   }
 
   function renderRecentTransactions() {

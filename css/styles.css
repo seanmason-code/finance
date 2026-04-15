@@ -1552,3 +1552,15 @@ body {
   margin-right: 2px;
 }
 @keyframes btn-spin { to { transform: rotate(360deg); } }
+
+/* Net Position widget */
+.net-position-card { padding: 0; overflow: hidden; }
+.net-position-inner { padding: 16px 20px; }
+.net-position-title { font-size: 14px; font-weight: 600; color: var(--text2); margin-bottom: 12px; letter-spacing: 0.05em; text-transform: uppercase; }
+.net-position-rows { display: flex; flex-direction: column; gap: 8px; }
+.net-position-row { display: flex; justify-content: space-between; font-size: 14px; color: var(--text2); }
+.net-position-row span:last-child { font-variant-numeric: tabular-nums; }
+.net-position-total { padding-top: 10px; border-top: 1px solid var(--border); font-size: 16px; font-weight: 700; color: var(--text); }
+
+/* Service account card */
+.account-card-balance-updated { font-size: 11px; color: var(--text2); margin-top: 2px; }
