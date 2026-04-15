@@ -562,7 +562,7 @@ const App = (() => {
         renderAccounts();
         showToast('Account saved');
       } catch (err) {
-        alert('Failed to save account: ' + err.message);
+        showToast('Failed to save account: ' + err.message, 'error');
       }
     });
 
@@ -576,7 +576,7 @@ const App = (() => {
         renderAccounts();
         showToast('Account deleted');
       } catch (err) {
-        alert('Failed to delete: ' + err.message);
+        showToast('Failed to delete account: ' + err.message, 'error');
       }
     });
   }
@@ -648,7 +648,7 @@ const App = (() => {
         renderDashboard();
         showToast('Service account saved');
       } catch (err) {
-        alert('Failed to save: ' + err.message);
+        showToast('Failed to save service account: ' + err.message, 'error');
       }
     });
 
@@ -663,7 +663,7 @@ const App = (() => {
         renderDashboard();
         showToast('Service account deleted');
       } catch (err) {
-        alert('Failed to delete: ' + err.message);
+        showToast('Failed to delete service account: ' + err.message, 'error');
       }
     });
   }
@@ -997,7 +997,7 @@ const App = (() => {
       refreshCurrentPage();
       clearAISnapshot();
     } catch (err) {
-      alert('Failed to save: ' + err.message);
+      showToast('Failed to save transaction: ' + err.message, 'error');
     }
   }
 
@@ -1009,7 +1009,7 @@ const App = (() => {
       refreshCurrentPage();
       clearAISnapshot();
     } catch (err) {
-      alert('Failed to delete: ' + err.message);
+      showToast('Failed to delete transaction: ' + err.message, 'error');
     }
   }
 
@@ -1285,7 +1285,7 @@ const App = (() => {
       closeModals();
       renderBudgets();
     } catch (err) {
-      alert('Failed to save budget: ' + err.message);
+      showToast('Failed to save budget: ' + err.message, 'error');
     }
   }
 
@@ -1296,7 +1296,7 @@ const App = (() => {
       budgets = budgets.filter(b => b.id !== id);
       renderBudgets();
     } catch (err) {
-      alert('Failed to delete: ' + err.message);
+      showToast('Failed to delete budget: ' + err.message, 'error');
     }
   }
 
@@ -1368,7 +1368,7 @@ const App = (() => {
           await upsertBudgetSafe(targetBudget);
           closeModals();
           renderBudgets();
-        } catch (err) { alert('Failed to move item: ' + err.message); }
+        } catch (err) { showToast('Failed to move item: ' + err.message, 'error'); }
         return;
       }
     }
@@ -1393,7 +1393,7 @@ const App = (() => {
         if (list && list.classList.contains('hidden')) toggle.click();
       }
     } catch (err) {
-      alert('Failed to save item: ' + err.message);
+      showToast('Failed to save budget item: ' + err.message, 'error');
     }
   }
 
@@ -1412,7 +1412,7 @@ const App = (() => {
         if (list && list.classList.contains('hidden')) toggle.click();
       }
     } catch (err) {
-      alert('Failed to delete item: ' + err.message);
+      showToast('Failed to delete budget item: ' + err.message, 'error');
     }
   }
 
@@ -1603,7 +1603,7 @@ const App = (() => {
       closeModals();
       renderRecurring();
     } catch (err) {
-      alert('Failed to save: ' + err.message);
+      showToast('Failed to save recurring: ' + err.message, 'error');
     }
   }
 
@@ -1614,7 +1614,7 @@ const App = (() => {
       recurring = recurring.filter(r => r.id !== id);
       renderRecurring();
     } catch (err) {
-      alert('Failed to delete: ' + err.message);
+      showToast('Failed to delete recurring: ' + err.message, 'error');
     }
   }
 
@@ -1761,7 +1761,7 @@ const App = (() => {
       refreshCurrentPage();
       showToast('Data imported successfully');
     } catch (err) {
-      alert('Import failed: ' + err.message);
+      showToast('Import failed: ' + err.message, 'error');
     }
     e.target.value = '';
   }
@@ -2127,11 +2127,12 @@ const App = (() => {
     else if (page === 'budgets') renderBudgets();
   }
 
-  function showToast(msg) {
+  function showToast(msg, type = 'success') {
     const toast = document.createElement('div');
     toast.textContent = msg;
+    const bg = type === 'error' ? '#ef4444' : '#6c63ff';
     toast.style.cssText = `
-      position:fixed;bottom:24px;right:24px;background:#6c63ff;color:white;
+      position:fixed;bottom:24px;right:24px;background:${bg};color:white;
       padding:10px 18px;border-radius:8px;font-size:14px;font-weight:600;
       z-index:9999;opacity:0;transition:opacity 0.2s;box-shadow:0 4px 20px rgba(0,0,0,0.4);
     `;
@@ -2140,7 +2141,7 @@ const App = (() => {
     setTimeout(() => {
       toast.style.opacity = '0';
       setTimeout(() => toast.remove(), 200);
-    }, 2500);
+    }, 3000);
   }
 
   function escHtml(str) {
