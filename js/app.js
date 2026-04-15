@@ -1847,6 +1847,39 @@ const App = (() => {
     refreshCurrentPage();
   }
 
+  async function silentlyLabelTransfers() {
+    const accountPatterns = [
+      /^\d{2}-\d{4}-\d{7}-\d{2}/,
+      /^\d{2}-\d{4}-\d{6}-\d{2}/,
+      /^\d{3}-\d{4}-\d{3}/,
+      /^\d{2}-\d{4}-\d{7}/,
+    ];
+    const transferKeywords = [
+      'transfer', 'trf', 'internet banking', 'online banking',
+      'between accounts', 'own account', 'savings transfer',
+      'mortgage', 'loan payment', 'from account', 'to account',
+    ];
+    const candidates = transactions.filter(t => {
+      if (t.category === 'Transfer') return false;
+      const desc = (t.description || '').toLowerCase();
+      return accountPatterns.some(p => p.test(t.description || '')) ||
+             transferKeywords.some(k => desc.includes(k));
+    });
+    let updated = 0;
+    for (const t of candidates) {
+      try {
+        const updatedTxn = { ...t, category: 'Transfer' };
+        await SB.upsertTransaction(updatedTxn);
+        const idx = transactions.findIndex(x => x.id === t.id);
+        if (idx !== -1) transactions[idx] = updatedTxn;
+        updated++;
+      } catch (err) {
+        console.error('Failed to label transfer:', err);
+      }
+    }
+    return updated;
+  }
+
   async function findAndLabelTransfers() {
     const resultEl = document.getElementById('transfer-result');
     const btn = document.getElementById('btn-find-transfers');
@@ -2121,7 +2154,9 @@ const App = (() => {
     const txnMsg = count > 0 ? `Imported ${count} transaction${count !== 1 ? 's' : ''}` : 'No new transactions';
     const balanceMsg = balancesUpdated > 0 ? ` · ${balancesUpdated} balance${balancesUpdated !== 1 ? 's' : ''} updated` : '';
     const patchMsg = accountsPatched > 0 ? ` · ${accountsPatched} account link${accountsPatched !== 1 ? 's' : ''} fixed` : '';
-    showToast(`${txnMsg}${balanceMsg}${patchMsg}`);
+    const transfersLabelled = await silentlyLabelTransfers();
+    const transferMsg = transfersLabelled > 0 ? ` · ${transfersLabelled} transfer${transfersLabelled !== 1 ? 's' : ''} labelled` : '';
+    showToast(`${txnMsg}${balanceMsg}${patchMsg}${transferMsg}`);
     _importRows = [];
     _csvFiles = [];
     if (serviceAccounts.length > 0) {
