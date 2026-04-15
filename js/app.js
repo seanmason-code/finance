@@ -660,8 +660,9 @@ const App = (() => {
 
   function categoryIcon(category) {
     const icons = {
-      'Housing': '🏠', 'Food & Dining': '🍽️', 'Transport': '🚗', 'Health': '💊',
-      'Entertainment': '🎬', 'Shopping': '🛍️', 'Utilities': '💡', 'Kids': '👶',
+      'Housing': '🏠', 'Food & Dining': '🍽️', 'Transport': '🚗',
+      'Transport: Fuel': '⛽', 'Transport: Parking & Tolls': '🅿️', 'Transport: Car Maintenance': '🔧',
+      'Health': '💊', 'Entertainment': '🎬', 'Shopping': '🛍️', 'Utilities': '💡', 'Kids': '👶',
       'Education': '📚', 'Personal Care': '💇', 'Savings': '🏦', 'Personal Spending': '🎉',
       'Transfer': '🔁',
       'Salary': '💼', 'Freelance': '💻', 'Rental Income': '🏡',
@@ -1799,8 +1800,10 @@ const App = (() => {
   async function doImport() {
     const toImport = _importRows.filter(r => r._checked);
     const btn = document.getElementById('import-confirm-btn');
-    btn.textContent = 'Importing...';
     btn.disabled = true;
+
+    const setBtnState = (label) => { btn.innerHTML = `<span class="btn-spinner"></span> ${label}`; };
+    setBtnState(`Saving 0 / ${toImport.length}`);
 
     let count = 0;
     const total = toImport.length;
@@ -1822,11 +1825,11 @@ const App = (() => {
       } catch (err) {
         console.error('Import row failed:', err);
       }
-      if (total > 0) btn.textContent = `Importing... ${Math.round((count / total) * 100)}%`;
+      setBtnState(`Saving ${count} / ${total}`);
     }
 
     // Update account balances from closing balance in CSV (runs even if all duplicates)
-    btn.textContent = 'Updating balances...';
+    btn.innerHTML = '<span class="btn-spinner"></span> Updating balances…';
     const lastBalances = CSVImport.getLastBalances(_importRows);
     let balancesUpdated = 0;
     for (const [accountNumber, balance] of Object.entries(lastBalances)) {

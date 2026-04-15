@@ -4,8 +4,8 @@ const CSVImport = (() => {
   const ANZ_OWN = ['01-0902'];
 
   const EXP_CATS = [
-    'Housing', 'Food & Dining', 'Transport', 'Health',
-    'Entertainment', 'Shopping', 'Utilities', 'Kids',
+    'Housing', 'Food & Dining', 'Transport: Fuel', 'Transport: Parking & Tolls', 'Transport: Car Maintenance',
+    'Health', 'Entertainment', 'Shopping', 'Utilities', 'Kids',
     'Education', 'Personal Care', 'Other'
   ];
   const INC_CATS = ['Salary', 'Freelance', 'Investment', 'Gift', 'Rental Income', 'Other Income'];
@@ -170,10 +170,11 @@ const CSVImport = (() => {
     // Cafes, restaurants, takeaways
     if (/CAFE|COFFEE|LUNCHBAR|SUSHI|RESTAURANT|PIZZA|BURGER|BAKERY|TAKEAWAY|KFC|MCDONALD|SUBWAY|DOMINO|NOODLE|CHICKEN|CHIP.?SHOP|UBER.*EAT|UBEREATS|BISTRO|EATERY|DINER|GRILL/.test(d)) return 'Food & Dining';
     if (/\bBAR\b/.test(d)) return 'Food & Dining';
-    // Transport
-    if (/\bBP\b|BP 2GO|\bZ \b|Z ENERGY|\bMOBIL\b|GULL|CALTEX|WAITOMO|PETROL|FUEL/.test(d)) return 'Transport';
-    if (/PARK(M?ATE|ING|\s)|WILSON P|AT HOP|AUCKLAND TRANSPORT|AKLD TRANSPORT|FERRY|TRAIN|BUS TICKET/.test(d)) return 'Transport';
-    if (/\bUBER\b/.test(d) && !/EAT/.test(d)) return 'Transport';
+    // Transport subcategories
+    if (/\bBP\b|BP 2GO|\bZ \b|Z ENERGY|\bMOBIL\b|GULL|CALTEX|WAITOMO|PETROL|FUEL/.test(d)) return 'Transport: Fuel';
+    if (/PARK(M?ATE|ING|\s)|WILSON P|AT HOP|AUCKLAND TRANSPORT|AKLD TRANSPORT|FERRY|TRAIN|BUS TICKET/.test(d)) return 'Transport: Parking & Tolls';
+    if (/\bUBER\b/.test(d) && !/EAT/.test(d)) return 'Transport: Parking & Tolls';
+    if (/WOF|WARRANT|TYRE|TIRE|MECHANIC|AUTO.*SERVICE|VEHICLE.*SERVICE|SERVICE.*VEHICLE|CAR.*REPAIR|REPAIR.*CAR|OIL.*CHANGE|AA \b|AA AUTO|BRIDGESTONE|FIRESTONE/.test(d)) return 'Transport: Car Maintenance';
     // Housing
     if (/MORTGAGE|RATES|BODY CORP/.test(d)) return 'Housing';
     // Utilities
