@@ -244,8 +244,8 @@ const App = (() => {
     const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     const monthTxns = transactions.filter(t => t.date.startsWith(thisMonth));
 
-    const income = monthTxns.filter(t => t.type === 'income' && t.category !== 'Transfer').reduce((s, t) => s + t.amount, 0);
-    const expenses = monthTxns.filter(t => t.type === 'expense' && t.category !== 'Transfer').reduce((s, t) => s + t.amount, 0);
+    const income = monthTxns.filter(t => t.type === 'income' && !isExcludedCategory(t.category)).reduce((s, t) => s + t.amount, 0);
+    const expenses = monthTxns.filter(t => t.type === 'expense' && !isExcludedCategory(t.category)).reduce((s, t) => s + t.amount, 0);
     const net = income - expenses;
 
     const weeklyIncome = income * 12 / 52;
@@ -281,7 +281,7 @@ const App = (() => {
     cutoff.setDate(cutoff.getDate() - 31);
     const cutoffStr = cutoff.toISOString().slice(0, 10);
 
-    const rolling = transactions.filter(t => t.date >= cutoffStr && t.category !== 'Transfer');
+    const rolling = transactions.filter(t => t.date >= cutoffStr && !isExcludedCategory(t.category));
     const income = rolling.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
     const expenses = rolling.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
 
@@ -414,7 +414,7 @@ const App = (() => {
       const key = `${year}-${String(month + 1).padStart(2, '0')}`;
       const daily = {};
       transactions
-        .filter(t => t.date.startsWith(key) && t.type === 'expense' && t.category !== 'Transfer')
+        .filter(t => t.date.startsWith(key) && t.type === 'expense' && !isExcludedCategory(t.category))
         .forEach(t => {
           const d = parseInt(t.date.slice(8, 10));
           if (d <= upToDay) daily[d] = (daily[d] || 0) + t.amount;
@@ -463,7 +463,7 @@ const App = (() => {
       const key = `${year}-${String(month + 1).padStart(2, '0')}`;
       const totals = {};
       transactions
-        .filter(t => t.date.startsWith(key) && t.type === 'expense' && t.category !== 'Transfer')
+        .filter(t => t.date.startsWith(key) && t.type === 'expense' && !isExcludedCategory(t.category))
         .forEach(t => {
           const d = parseInt(t.date.slice(8, 10));
           if (d <= upToDay) totals[t.category || 'Uncategorised'] = (totals[t.category || 'Uncategorised'] || 0) + t.amount;
@@ -591,8 +591,8 @@ const App = (() => {
     }
 
     const totalBalance = accounts.reduce((s, a) => s + (a.balance || 0), 0);
-    const monthIncome = transactions.filter(t => t.type === 'income' && t.category !== 'Transfer' && t.date.startsWith(thisMonth)).reduce((s, t) => s + t.amount, 0);
-    const monthExpense = transactions.filter(t => t.type === 'expense' && t.category !== 'Transfer' && t.date.startsWith(thisMonth)).reduce((s, t) => s + t.amount, 0);
+    const monthIncome = transactions.filter(t => t.type === 'income' && !isExcludedCategory(t.category) && t.date.startsWith(thisMonth)).reduce((s, t) => s + t.amount, 0);
+    const monthExpense = transactions.filter(t => t.type === 'expense' && !isExcludedCategory(t.category) && t.date.startsWith(thisMonth)).reduce((s, t) => s + t.amount, 0);
 
     totalEl.innerHTML = `
       <div class="accounts-total">
@@ -732,8 +732,8 @@ const App = (() => {
     const color = a.color || '#6c63ff';
     const icon = BANK_ICONS[a.bank] || '💳';
     const txns = transactions.filter(t => t.account && accNumMatches(a.account_number, t.account) && t.date.startsWith(thisMonth));
-    const monthIn = txns.filter(t => t.type === 'income' && t.category !== 'Transfer').reduce((s, t) => s + t.amount, 0);
-    const monthOut = txns.filter(t => t.type === 'expense' && t.category !== 'Transfer').reduce((s, t) => s + t.amount, 0);
+    const monthIn = txns.filter(t => t.type === 'income' && !isExcludedCategory(t.category)).reduce((s, t) => s + t.amount, 0);
+    const monthOut = txns.filter(t => t.type === 'expense' && !isExcludedCategory(t.category)).reduce((s, t) => s + t.amount, 0);
 
     const updatedAt = a.balance_updated_at
       ? (() => { const d = new Date(a.balance_updated_at); const diff = Math.round((Date.now() - d) / 86400000); return diff === 0 ? 'Updated today' : diff === 1 ? 'Updated yesterday' : `Updated ${diff} days ago`; })()
@@ -1018,11 +1018,11 @@ const App = (() => {
       if (month && !t.date.startsWith(month)) return false;
       if (category && t.category !== category) return false;
       if (type === 'transfer') {
-        if (t.category !== 'Transfer') return false;
+        if (!isExcludedCategory(t.category)) return false;
       } else if (type === 'income') {
-        if (t.type !== 'income' || t.category === 'Transfer') return false;
+        if (t.type !== 'income' || isExcludedCategory(t.category)) return false;
       } else if (type === 'expense') {
-        if (t.type !== 'expense' || t.category === 'Transfer') return false;
+        if (t.type !== 'expense' || isExcludedCategory(t.category)) return false;
       }
       if (search && !t.description.toLowerCase().includes(search) &&
           !t.category.toLowerCase().includes(search)) return false;
@@ -1160,17 +1160,23 @@ const App = (() => {
 
   let _reportDate = new Date();
 
+  // Categories excluded from income/expense totals because they're not real
+  // money flow: Transfer = movement between own accounts, Work CC = reimbursed
+  // work spending that passes through (expense paid off by employer payment).
+  const EXCLUDED_CATEGORIES = ['Transfer', 'Work CC'];
+  const isExcludedCategory = c => EXCLUDED_CATEGORIES.includes(c);
+
   const DEFAULT_EXPENSE_CATEGORIES = [
     'Housing','Mortgage','Rates','Food & Dining','Transport','Transport: Fuel',
     'Transport: Parking & Tolls','Transport: Car Maintenance',
     'Health','Insurance','Entertainment','Subscriptions',
     'Shopping','Utilities','Kids','Travel','Savings',
     'Investments','Work Expenses','Education','Personal Care',
-    'Personal Spending','Transfer','Other',
+    'Personal Spending','Work CC','Transfer','Other',
   ];
   const DEFAULT_INCOME_CATEGORIES = [
     'Salary','Freelance','Rental Income','Investment',
-    'Gift','Reimbursements','Other Income','Transfer',
+    'Gift','Reimbursements','Other Income','Work CC','Transfer',
   ];
 
   // Per-category billing windows: 0 = calendar month, N = rolling N days, undefined = default 30d
@@ -1232,7 +1238,7 @@ const App = (() => {
       'Shopping': '🛍️', 'Utilities': '💡', 'Kids': '👶', 'Travel': '✈️',
       'Savings': '🏦', 'Investments': '📊', 'Work Expenses': '🧾',
       'Education': '📚', 'Personal Care': '💇', 'Personal Spending': '🎉',
-      'Transfer': '🔁',
+      'Transfer': '🔁', 'Work CC': '💼',
       'Salary': '💼', 'Freelance': '💻', 'Rental Income': '🏡',
       'Investment': '📈', 'Gift': '🎁', 'Reimbursements': '🔄', 'Other Income': '💰', 'Other': '📌'
     };
@@ -1495,7 +1501,7 @@ const App = (() => {
         const now = new Date();
         const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
         const actualByCategory = {};
-        transactions.filter(t => t.type === 'expense' && t.category !== 'Transfer' && t.date.startsWith(thisMonth))
+        transactions.filter(t => t.type === 'expense' && !isExcludedCategory(t.category) && t.date.startsWith(thisMonth))
           .forEach(t => { actualByCategory[t.category] = (actualByCategory[t.category] || 0) + t.amount; });
         return filtered.map(b => {
         const items = b.items || [];
@@ -2016,7 +2022,7 @@ const App = (() => {
     const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const lastMonth = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, '0')}`;
 
-    const incomeTxns = transactions.filter(t => t.type === 'income' && t.category !== 'Transfer');
+    const incomeTxns = transactions.filter(t => t.type === 'income' && !isExcludedCategory(t.category));
     const thisMonthIncome = incomeTxns.filter(t => t.date.startsWith(thisMonth));
     const lastMonthIncome = incomeTxns.filter(t => t.date.startsWith(lastMonth));
 
@@ -2439,7 +2445,7 @@ const App = (() => {
     const toFix = transactions.filter(t =>
       t.type === 'expense' &&
       t.category !== 'Personal Spending' &&
-      t.category !== 'Transfer' &&
+      !isExcludedCategory(t.category) &&
       personalAccounts.some(a => t.account && t.account.includes(a.slice(-2)) && t.account.startsWith('38-9020-0211287'))
     );
 
