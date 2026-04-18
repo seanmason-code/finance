@@ -289,10 +289,91 @@ const Charts = (() => {
     });
   }
 
-  function renderSpendCompareChart(thisCumul, lastCumul, expectedCumul, today, thisMonthName, lastMonthName) {
+  function renderSpendCompareChart(thisCumul, lastCumul, expectedCumul, avgCumul, today, thisMonthName, lastMonthName) {
     const canvas = document.getElementById('chart-spend-compare');
     if (!canvas) return;
     if (spendCompareChart) { spendCompareChart.destroy(); spendCompareChart = null; }
+
+    // "You are here" marker = last non-null index of thisCumul
+    let markerIdx = -1;
+    for (let i = thisCumul.length - 1; i >= 0; i--) {
+      if (thisCumul[i] != null) { markerIdx = i; break; }
+    }
+    const thisPointRadius = thisCumul.map((_, i) => i === markerIdx ? 7 : 0);
+    const thisPointBg = thisCumul.map((_, i) => i === markerIdx ? '#6c63ff' : 'transparent');
+    const thisPointBorder = thisCumul.map((_, i) => i === markerIdx ? '#fff' : 'transparent');
+
+    // Tight Y-range so the biggest movement fills the chart. Net-flow lines can
+    // dip below zero on income days, so compute both ends from the data.
+    const allVals = [
+      ...thisCumul.filter(v => v != null),
+      ...lastCumul.filter(v => v != null),
+      ...(expectedCumul ? expectedCumul.filter(v => v != null) : []),
+      ...(avgCumul ? avgCumul.filter(v => v != null) : [])
+    ];
+    const seriesMax = allVals.length ? Math.max(...allVals) : 0;
+    const seriesMin = allVals.length ? Math.min(...allVals) : 0;
+    const yMax = seriesMax > 0 ? Math.ceil(seriesMax * 1.04 / 1000) * 1000 : undefined;
+    const yMin = seriesMin < 0 ? Math.floor(seriesMin * 1.04 / 1000) * 1000 : 0;
+
+    // "Today" pill + down-arrow marker plugin (replaces the old thin vertical line)
+    const todayLinePlugin = {
+      id: 'todayLine',
+      afterDatasetsDraw(chart) {
+        if (markerIdx < 0) return;
+        const meta = chart.getDatasetMeta(0);
+        const pt = meta.data[markerIdx];
+        if (!pt) return;
+        const { ctx, chartArea } = chart;
+
+        // Vertical dashed line from just below the pill down to the baseline
+        ctx.save();
+        ctx.strokeStyle = 'rgba(108,99,255,0.7)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 3]);
+        ctx.beginPath();
+        ctx.moveTo(pt.x, chartArea.top + 18);
+        ctx.lineTo(pt.x, chartArea.bottom);
+        ctx.stroke();
+        ctx.restore();
+
+        // Pill label
+        const labelY = chartArea.top + 10;
+        const labelText = 'Today';
+        ctx.save();
+        ctx.font = '600 11px Inter, system-ui, sans-serif';
+        const padX = 8;
+        const textW = ctx.measureText(labelText).width;
+        const pillW = textW + padX * 2;
+        const pillH = 18;
+        let pillX = pt.x - pillW / 2;
+        pillX = Math.max(chartArea.left + 2, Math.min(pillX, chartArea.right - pillW - 2));
+        const r = 9;
+        ctx.fillStyle = '#6c63ff';
+        ctx.beginPath();
+        ctx.moveTo(pillX + r, labelY - pillH / 2);
+        ctx.arcTo(pillX + pillW, labelY - pillH / 2, pillX + pillW, labelY + pillH / 2, r);
+        ctx.arcTo(pillX + pillW, labelY + pillH / 2, pillX, labelY + pillH / 2, r);
+        ctx.arcTo(pillX, labelY + pillH / 2, pillX, labelY - pillH / 2, r);
+        ctx.arcTo(pillX, labelY - pillH / 2, pillX + pillW, labelY - pillH / 2, r);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(labelText, pillX + pillW / 2, labelY);
+
+        // Down-arrow triangle sitting under the pill, pointing toward the dot
+        ctx.fillStyle = '#6c63ff';
+        ctx.beginPath();
+        ctx.moveTo(pt.x - 5, labelY + pillH / 2 + 2);
+        ctx.lineTo(pt.x + 5, labelY + pillH / 2 + 2);
+        ctx.lineTo(pt.x, labelY + pillH / 2 + 9);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+    };
 
     const datasets = [
       {
@@ -301,7 +382,11 @@ const Charts = (() => {
         borderColor: '#6c63ff',
         backgroundColor: 'rgba(108,99,255,0.08)',
         borderWidth: 2,
-        pointRadius: 0,
+        pointRadius: thisPointRadius,
+        pointBackgroundColor: thisPointBg,
+        pointBorderColor: thisPointBorder,
+        pointBorderWidth: 2,
+        pointHoverRadius: 5,
         tension: 0.3,
         fill: true,
       },
@@ -332,12 +417,29 @@ const Charts = (() => {
       });
     }
 
+    if (avgCumul) {
+      datasets.push({
+        label: '6-mo avg cycle',
+        data: avgCumul,
+        borderColor: 'rgba(34,197,94,0.75)',
+        backgroundColor: 'transparent',
+        borderWidth: 1.5,
+        borderDash: [7, 3],
+        pointRadius: 0,
+        tension: 0.3,
+        fill: false,
+        spanGaps: false,
+      });
+    }
+
     spendCompareChart = new Chart(canvas, {
       type: 'line',
       data: { labels: Array.from({ length: today }, (_, i) => i + 1), datasets },
+      plugins: [todayLinePlugin],
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        layout: { padding: { top: 22 } },
         plugins: {
           legend: { display: false },
           tooltip: {
@@ -350,6 +452,8 @@ const Charts = (() => {
             ticks: { maxTicksLimit: 8, font: { size: 10 }, color: '#8888aa' }
           },
           y: {
+            min: yMin,
+            max: yMax,
             grid: { color: 'rgba(42,42,69,0.5)' },
             ticks: { callback: (v) => formatCurrency(v, true), font: { size: 10 }, color: '#8888aa' }
           }

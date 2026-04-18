@@ -398,11 +398,296 @@ const App = (() => {
     `;
   }
 
+  // Keyword used to identify Jenny's salary transactions (case-insensitive match
+  // against the transaction description). Anchor for the pay-cycle comparison
+  // below. Change this if Jenny's employer name appears differently on the bank
+  // feed, or blank it out to fall back to any Salary-category income.
+  const PAY_CYCLE_KEYWORD = 'LOREAL';
+
+  // --- Pay-cycle helpers ---
+  function isoDate(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${dd}`;
+  }
+  function parseISO(s) { return new Date(s + 'T12:00:00'); }
+  function daysBetween(aStr, bStr) {
+    const a = parseISO(aStr), b = parseISO(bStr);
+    return Math.round((b - a) / 86400000);
+  }
+  function addDays(startStr, n) {
+    const d = parseISO(startStr);
+    d.setDate(d.getDate() + n);
+    return isoDate(d);
+  }
+  function formatShortDate(s) {
+    return parseISO(s).toLocaleDateString('en', { day: 'numeric', month: 'short' });
+  }
+
+  // Find paydays (most-recent-first, on or before today). Uses Jenny-specific
+  // keyword if it matches any Salary transactions, otherwise falls back to any
+  // Salary-category income deduped to one per date.
+  function findPaydays(todayStr) {
+    const salary = transactions.filter(t => t.type === 'income' && t.category === 'Salary' && t.date <= todayStr);
+    const needle = PAY_CYCLE_KEYWORD.trim().toLowerCase();
+    let source = needle
+      ? salary.filter(t => (t.description || '').toLowerCase().includes(needle))
+      : [];
+    if (source.length < 2) source = salary; // fallback
+    const uniqueDates = [...new Set(source.map(t => t.date))];
+    return uniqueDates.sort((a, b) => b.localeCompare(a));
+  }
+
+  // Net cash-out cumulative between [startStr, endStr] (inclusive), bucketed by
+  // day-offset from startStr. Expenses add to the line; non-anchor income
+  // (Buckley, Rental, etc.) subtracts from it — so the line dips when money
+  // lands mid-cycle. Jenny's Loreal salary is excluded because it's the anchor
+  // that defines the cycle start.
+  function buildCycleCumulative(startStr, endStr, targetLen, pad) {
+    const daysSpan = daysBetween(startStr, endStr);
+    const anchorNeedle = PAY_CYCLE_KEYWORD.trim().toLowerCase();
+    const daily = {};
+    transactions
+      .filter(t => t.type === 'expense' && !isExcludedCategory(t.category) && t.date >= startStr && t.date <= endStr)
+      .forEach(t => {
+        const offset = daysBetween(startStr, t.date);
+        daily[offset] = (daily[offset] || 0) + t.amount;
+      });
+    transactions
+      .filter(t => {
+        if (t.type !== 'income' || isExcludedCategory(t.category)) return false;
+        if (t.date < startStr || t.date > endStr) return false;
+        if (anchorNeedle && (t.description || '').toLowerCase().includes(anchorNeedle)) return false;
+        return true;
+      })
+      .forEach(t => {
+        const offset = daysBetween(startStr, t.date);
+        daily[offset] = (daily[offset] || 0) - t.amount;
+      });
+    const out = [];
+    let running = 0;
+    for (let i = 0; i <= daysSpan; i++) {
+      running += daily[i] || 0;
+      out[i] = running;
+    }
+    while (out.length < targetLen) out.push(pad ? running : null);
+    return out.slice(0, targetLen);
+  }
+
+  // Expected-pace line from recurring expenses with day_of_month, projected
+  // onto the current cycle window.
+  function buildExpectedCycleCumulative(startStr, endStr, targetLen) {
+    const daysSpan = daysBetween(startStr, endStr);
+    const daily = {};
+    const start = parseISO(startStr);
+    (recurring || [])
+      .filter(r => r.active && r.type === 'expense' && r.day_of_month)
+      .forEach(r => {
+        // Find the first occurrence of day_of_month on or after startStr within the window
+        let d = new Date(start);
+        d.setDate(r.day_of_month);
+        if (d < start) d.setMonth(d.getMonth() + 1);
+        const offset = daysBetween(startStr, isoDate(d));
+        if (offset >= 0 && offset <= daysSpan) {
+          daily[offset] = (daily[offset] || 0) + r.amount;
+        }
+      });
+    const out = [];
+    let running = 0;
+    for (let i = 0; i <= daysSpan; i++) {
+      running += daily[i] || 0;
+      out[i] = running;
+    }
+    while (out.length < targetLen) out.push(running);
+    return out.slice(0, targetLen);
+  }
+
+  // Average cumulative spend across every full pay-cycle in the last ~6 months.
+  // At each day-offset, averages only cycles that reached that day, so the line
+  // naturally shortens if older cycles were shorter than the current one.
+  function buildHistoricalAverageCumul(allPaydays, todayStr, targetLen) {
+    const sixMonthsAgo = addDays(todayStr, -183);
+    const recent = [...allPaydays]
+      .filter(d => d >= sixMonthsAgo && d <= todayStr)
+      .sort((a, b) => a.localeCompare(b));
+    if (recent.length < 2) return null;
+
+    const anchorNeedle = PAY_CYCLE_KEYWORD.trim().toLowerCase();
+    const cycles = [];
+    for (let i = 0; i < recent.length - 1; i++) {
+      const start = recent[i];
+      const nextStart = recent[i + 1];
+      const cycleLen = daysBetween(start, nextStart);
+      if (cycleLen <= 0) continue;
+      const endStr = addDays(start, cycleLen - 1);
+      const daily = {};
+      transactions
+        .filter(t => t.type === 'expense' && !isExcludedCategory(t.category) && t.date >= start && t.date <= endStr)
+        .forEach(t => {
+          const offset = daysBetween(start, t.date);
+          daily[offset] = (daily[offset] || 0) + t.amount;
+        });
+      transactions
+        .filter(t => {
+          if (t.type !== 'income' || isExcludedCategory(t.category)) return false;
+          if (t.date < start || t.date > endStr) return false;
+          if (anchorNeedle && (t.description || '').toLowerCase().includes(anchorNeedle)) return false;
+          return true;
+        })
+        .forEach(t => {
+          const offset = daysBetween(start, t.date);
+          daily[offset] = (daily[offset] || 0) - t.amount;
+        });
+      const cumul = [];
+      let running = 0;
+      for (let d = 0; d < cycleLen; d++) {
+        running += daily[d] || 0;
+        cumul[d] = running;
+      }
+      cycles.push(cumul);
+    }
+    if (cycles.length === 0) return null;
+
+    const avg = [];
+    for (let d = 0; d < targetLen; d++) {
+      let sum = 0, count = 0;
+      for (const c of cycles) {
+        if (d < c.length) { sum += c[d]; count++; }
+      }
+      avg.push(count === 0 ? null : sum / count);
+    }
+    return avg;
+  }
+
+  function buildCycleCategoryTotals(startStr, endStr) {
+    const totals = {};
+    transactions
+      .filter(t => t.type === 'expense' && !isExcludedCategory(t.category) && t.date >= startStr && t.date <= endStr)
+      .forEach(t => {
+        const cat = t.category || 'Uncategorised';
+        totals[cat] = (totals[cat] || 0) + t.amount;
+      });
+    return totals;
+  }
+
   function renderSpendComparison() {
     const card = document.getElementById('spend-comparison-card');
     if (!card) return;
 
     const now = new Date();
+    const todayStr = isoDate(now);
+    const paydays = findPaydays(todayStr);
+
+    // Need at least two paydays to anchor a cycle comparison; otherwise fall
+    // back to the original calendar-month view.
+    if (paydays.length < 2) { renderSpendComparisonCalendar(card, now); return; }
+
+    const currentStart = paydays[0];                     // most recent payday ≤ today
+    const previousStart = paydays[1];                    // payday before that
+    const previousCycleDays = daysBetween(previousStart, currentStart); // length of prior cycle
+    const currentElapsed = daysBetween(currentStart, todayStr);         // 0 = today is payday itself
+    const maxDays = Math.max(previousCycleDays, currentElapsed + 1);
+
+    const thisCumul = buildCycleCumulative(currentStart, todayStr, maxDays, false);
+    const lastCumulEnd = addDays(previousStart, previousCycleDays - 1);
+    const lastCumul = buildCycleCumulative(previousStart, lastCumulEnd, maxDays, true);
+
+    // Expected pace projected through the full estimated current cycle
+    const projectedEnd = addDays(currentStart, previousCycleDays - 1);
+    const expectedCumul = buildExpectedCycleCumulative(currentStart, projectedEnd, maxDays);
+
+    // 6-month average cycle — historical benchmark
+    const avgCumul = buildHistoricalAverageCumul(paydays, todayStr, maxDays);
+
+    const thisTotal = thisCumul[currentElapsed] || 0;
+    const lastTotal = lastCumul[lastCumul.length - 1] || 0;
+    const expectedTotal = expectedCumul[expectedCumul.length - 1] || 0;
+
+    if (thisTotal === 0 && lastTotal === 0) { card.style.display = 'none'; return; }
+    card.style.display = '';
+
+    // Compare at the same cycle-day (apples-to-apples pacing)
+    const lastAtSameDay = lastCumul[currentElapsed] ?? lastTotal;
+    const expectedAtSameDay = expectedCumul[currentElapsed] ?? expectedTotal;
+    const vsLast = lastAtSameDay - thisTotal;
+    const vsBudget = expectedTotal > 0 ? expectedAtSameDay - thisTotal : null;
+
+    const thisRange = `${formatShortDate(currentStart)}–${formatShortDate(projectedEnd)}`;
+    const lastRange = `${formatShortDate(previousStart)}–${formatShortDate(lastCumulEnd)}`;
+
+    const vsLastBadge = `
+      <span class="spend-compare-delta ${vsLast >= 0 ? 'delta-better' : 'delta-worse'}">
+        ${vsLast >= 0 ? '▼' : '▲'} ${formatCurrency(Math.abs(vsLast), true)} vs last cycle
+        <button class="why-btn" id="btn-why-last" title="See what drove the difference">Why?</button>
+      </span>`;
+
+    const vsBudgetBadge = vsBudget !== null ? `
+      <span class="spend-compare-delta ${vsBudget >= 0 ? 'delta-better' : 'delta-worse'}">
+        ${vsBudget >= 0 ? '▼' : '▲'} ${formatCurrency(Math.abs(vsBudget), true)} vs expected pace
+      </span>` : '';
+
+    card.innerHTML = `
+      <div class="spend-compare-inner">
+        <div class="spend-compare-header">
+          <span class="spend-compare-title">📊 Day ${currentElapsed + 1} of pay cycle</span>
+          <div class="spend-compare-badges">${vsLastBadge}${vsBudgetBadge}</div>
+        </div>
+        <div style="height:200px;position:relative;margin-top:14px;">
+          <canvas id="chart-spend-compare"></canvas>
+        </div>
+        <div class="spend-compare-legend">
+          <span class="legend-item"><span class="legend-swatch swatch-this"></span>This cycle <span class="why-sub">${thisRange}</span></span>
+          <span class="legend-item"><span class="legend-swatch swatch-last"></span>Last cycle <span class="why-sub">${lastRange}</span></span>
+          ${avgCumul ? '<span class="legend-item"><span class="legend-swatch swatch-avg"></span>6-mo avg cycle</span>' : ''}
+          ${expectedTotal > 0 ? '<span class="legend-item"><span class="legend-swatch swatch-expected"></span>Expected pace</span>' : ''}
+        </div>
+        <div id="spend-why-panel" class="spend-why-panel hidden"></div>
+      </div>
+    `;
+
+    Charts.renderSpendCompareChart(thisCumul, lastCumul, expectedTotal > 0 ? expectedCumul : null, avgCumul, maxDays, 'This cycle', 'Last cycle');
+
+    document.getElementById('btn-why-last')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const panel = document.getElementById('spend-why-panel');
+      if (!panel.classList.contains('hidden')) { panel.classList.add('hidden'); return; }
+
+      const thisCats = buildCycleCategoryTotals(currentStart, todayStr);
+      // Same number of elapsed days into the previous cycle
+      const lastCompareEnd = addDays(previousStart, currentElapsed);
+      const lastCats = buildCycleCategoryTotals(previousStart, lastCompareEnd);
+      const allCats = [...new Set([...Object.keys(thisCats), ...Object.keys(lastCats)])];
+
+      const diffs = allCats.map(cat => ({
+        cat,
+        thisAmt: thisCats[cat] || 0,
+        lastAmt: lastCats[cat] || 0,
+        diff: (lastCats[cat] || 0) - (thisCats[cat] || 0),
+      })).sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff)).slice(0, 7);
+
+      panel.innerHTML = `
+        <div class="why-header">This cycle vs last cycle — by category <span class="why-sub">(day 1–${currentElapsed + 1})</span></div>
+        ${diffs.map(d => `
+          <div class="why-row">
+            <span class="why-cat">${categoryIcon(d.cat)} ${escHtml(d.cat)}</span>
+            <span class="why-amounts">
+              <span class="why-month">This ${formatCurrency(d.thisAmt, true)}</span>
+              <span class="why-sep">vs</span>
+              <span class="why-month">Last ${formatCurrency(d.lastAmt, true)}</span>
+            </span>
+            <span class="why-delta ${d.diff >= 0 ? 'delta-better' : 'delta-worse'}">
+              ${d.diff >= 0 ? '▼' : '▲'} ${formatCurrency(Math.abs(d.diff), true)}
+            </span>
+          </div>
+        `).join('')}
+      `;
+      panel.classList.remove('hidden');
+    });
+  }
+
+  // Calendar-month fallback used when we don't have two paydays to anchor against.
+  function renderSpendComparisonCalendar(card, now) {
     const today = now.getDate();
     const thisYear = now.getFullYear();
     const thisMonth = now.getMonth();
@@ -420,75 +705,44 @@ const App = (() => {
           if (d <= upToDay) daily[d] = (daily[d] || 0) + t.amount;
         });
       let running = 0;
-      return Array.from({ length: upToDay }, (_, i) => {
-        running += daily[i + 1] || 0;
-        return running;
-      });
+      return Array.from({ length: upToDay }, (_, i) => { running += daily[i + 1] || 0; return running; });
     }
-
-    // Build expected pace from recurring expenses with a day_of_month
     function buildExpectedCumulative(upToDay) {
       const daily = {};
       (recurring || [])
         .filter(r => r.active && r.type === 'expense' && r.day_of_month)
-        .forEach(r => {
-          const d = r.day_of_month;
-          if (d <= upToDay) daily[d] = (daily[d] || 0) + r.amount;
-        });
+        .forEach(r => { const d = r.day_of_month; if (d <= upToDay) daily[d] = (daily[d] || 0) + r.amount; });
       let running = 0;
-      return Array.from({ length: upToDay }, (_, i) => {
-        running += daily[i + 1] || 0;
-        return running;
-      });
+      return Array.from({ length: upToDay }, (_, i) => { running += daily[i + 1] || 0; return running; });
     }
 
     const thisCumul = buildActualCumulative(thisYear, thisMonth, today);
     const lastCumul = buildActualCumulative(lastYear, lastMonth, today);
     const expectedCumul = buildExpectedCumulative(today);
-
     const thisTotal = thisCumul[thisCumul.length - 1] || 0;
     const lastTotal = lastCumul[lastCumul.length - 1] || 0;
     const expectedTotal = expectedCumul[expectedCumul.length - 1] || 0;
-
     if (thisTotal === 0 && lastTotal === 0) { card.style.display = 'none'; return; }
     card.style.display = '';
-
     const vsLast = lastTotal - thisTotal;
     const vsBudget = expectedTotal > 0 ? expectedTotal - thisTotal : null;
     const lastMonthName = lastMonthDate.toLocaleDateString('en', { month: 'long' });
     const thisMonthName = now.toLocaleDateString('en', { month: 'long' });
 
-    // Category breakdown for "Why?" drill-down
-    function buildCategoryTotals(year, month, upToDay) {
-      const key = `${year}-${String(month + 1).padStart(2, '0')}`;
-      const totals = {};
-      transactions
-        .filter(t => t.date.startsWith(key) && t.type === 'expense' && !isExcludedCategory(t.category))
-        .forEach(t => {
-          const d = parseInt(t.date.slice(8, 10));
-          if (d <= upToDay) totals[t.category || 'Uncategorised'] = (totals[t.category || 'Uncategorised'] || 0) + t.amount;
-        });
-      return totals;
-    }
-
-    const vsLastBadge = `
-      <span class="spend-compare-delta ${vsLast >= 0 ? 'delta-better' : 'delta-worse'}">
-        ${vsLast >= 0 ? '▼' : '▲'} ${formatCurrency(Math.abs(vsLast), true)} vs ${lastMonthName}
-        <button class="why-btn" id="btn-why-last" title="See what drove the difference">Why?</button>
-      </span>`;
-
-    const vsBudgetBadge = vsBudget !== null ? `
-      <span class="spend-compare-delta ${vsBudget >= 0 ? 'delta-better' : 'delta-worse'}">
-        ${vsBudget >= 0 ? '▼' : '▲'} ${formatCurrency(Math.abs(vsBudget), true)} vs expected pace
-      </span>` : '';
-
     card.innerHTML = `
       <div class="spend-compare-inner">
         <div class="spend-compare-header">
           <span class="spend-compare-title">📊 Day ${today} of ${thisMonthName}</span>
-          <div class="spend-compare-badges">${vsLastBadge}${vsBudgetBadge}</div>
+          <div class="spend-compare-badges">
+            <span class="spend-compare-delta ${vsLast >= 0 ? 'delta-better' : 'delta-worse'}">
+              ${vsLast >= 0 ? '▼' : '▲'} ${formatCurrency(Math.abs(vsLast), true)} vs ${lastMonthName}
+            </span>
+            ${vsBudget !== null ? `<span class="spend-compare-delta ${vsBudget >= 0 ? 'delta-better' : 'delta-worse'}">
+              ${vsBudget >= 0 ? '▼' : '▲'} ${formatCurrency(Math.abs(vsBudget), true)} vs expected pace
+            </span>` : ''}
+          </div>
         </div>
-        <div style="height:80px;position:relative;margin-top:14px;">
+        <div style="height:200px;position:relative;margin-top:14px;">
           <canvas id="chart-spend-compare"></canvas>
         </div>
         <div class="spend-compare-legend">
@@ -496,46 +750,9 @@ const App = (() => {
           <span class="legend-last"></span>${lastMonthName}
           ${expectedTotal > 0 ? '<span class="legend-expected"></span>Expected pace' : ''}
         </div>
-        <div id="spend-why-panel" class="spend-why-panel hidden"></div>
       </div>
     `;
-
     Charts.renderSpendCompareChart(thisCumul, lastCumul, expectedTotal > 0 ? expectedCumul : null, today, thisMonthName, lastMonthName);
-
-    document.getElementById('btn-why-last')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const panel = document.getElementById('spend-why-panel');
-      if (!panel.classList.contains('hidden')) { panel.classList.add('hidden'); return; }
-
-      const thisCats = buildCategoryTotals(thisYear, thisMonth, today);
-      const lastCats = buildCategoryTotals(lastYear, lastMonth, today);
-      const allCats = [...new Set([...Object.keys(thisCats), ...Object.keys(lastCats)])];
-
-      const diffs = allCats.map(cat => ({
-        cat,
-        thisAmt: thisCats[cat] || 0,
-        lastAmt: lastCats[cat] || 0,
-        diff: (lastCats[cat] || 0) - (thisCats[cat] || 0),
-      })).sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff)).slice(0, 7);
-
-      panel.innerHTML = `
-        <div class="why-header">vs ${lastMonthName} — by category <span class="why-sub">(day 1–${today})</span></div>
-        ${diffs.map(d => `
-          <div class="why-row">
-            <span class="why-cat">${categoryIcon(d.cat)} ${escHtml(d.cat)}</span>
-            <span class="why-amounts">
-              <span class="why-month">${thisMonthName.slice(0,3)} ${formatCurrency(d.thisAmt, true)}</span>
-              <span class="why-sep">vs</span>
-              <span class="why-month">${lastMonthName.slice(0,3)} ${formatCurrency(d.lastAmt, true)}</span>
-            </span>
-            <span class="why-delta ${d.diff >= 0 ? 'delta-better' : 'delta-worse'}">
-              ${d.diff >= 0 ? '▼' : '▲'} ${formatCurrency(Math.abs(d.diff), true)}
-            </span>
-          </div>
-        `).join('')}
-      `;
-      panel.classList.remove('hidden');
-    });
   }
 
   function renderRecentTransactions() {
