@@ -2007,7 +2007,7 @@ const App = (() => {
 
   // ===== Income =====
   function renderIncome() {
-    const container = document.getElementById('recurring-list');
+    const container = document.getElementById('income-list');
     const summary = document.getElementById('income-summary');
     if (!container) return;
 

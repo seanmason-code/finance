@@ -98,6 +98,10 @@
           <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
           Income
         </a></li>
+        <li><a href="#" data-page="recurring">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          Recurring
+        </a></li>
         <li><a href="#" data-page="reports">
           <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
           Reports
@@ -325,12 +329,17 @@
           <h1>Income</h1>
         </header>
         <div id="income-summary"></div>
-        <div id="recurring-list"></div>
+        <div id="income-list"></div>
       </div>
 
-      <!-- Recurring Page (hidden, kept for compatibility) -->
-      <div id="page-recurring" class="page" style="display:none">
-        <div class="recurring-summary" id="recurring-summary"></div>
+      <!-- Recurring Page -->
+      <div id="page-recurring" class="page">
+        <header class="page-header">
+          <h1>Recurring</h1>
+          <button id="btn-add-recurring" class="btn-primary">+ Add Recurring</button>
+        </header>
+        <div id="recurring-summary"></div>
+        <div id="recurring-list"></div>
       </div>
 
       <!-- AI Advisor Page -->
