@@ -2085,6 +2085,7 @@ const App = (() => {
   function renderRecurring() {
     const container = document.getElementById('recurring-list');
     const summary = document.getElementById('recurring-summary');
+    if (!container || !summary) return;
 
     // Weekly/monthly summary
     let totalWeeklyIn = 0, totalWeeklyOut = 0;
@@ -2217,7 +2218,9 @@ const App = (() => {
 
   async function saveRecurring(e) {
     e.preventDefault();
-    const id = document.getElementById('recurring-id').value || crypto.randomUUID();
+    const existingId = document.getElementById('recurring-id').value;
+    const id = existingId || crypto.randomUUID();
+    const existing = recurring.find(x => x.id === id);
     const r = {
       id,
       type: document.getElementById('recurring-type').value,
@@ -2226,13 +2229,14 @@ const App = (() => {
       category: document.getElementById('recurring-category').value,
       frequency: document.getElementById('recurring-frequency').value,
       day_of_month: parseInt(document.getElementById('recurring-day').value) || 1,
-      active: true,
+      active: existing ? existing.active : true,
     };
     try {
       await SB.upsertRecurring(r);
       const idx = recurring.findIndex(x => x.id === id);
       if (idx >= 0) recurring[idx] = r; else recurring.push(r);
       closeModals();
+      renderRecurring();
       renderIncome();
     } catch (err) {
       showToast('Failed to save recurring: ' + err.message, 'error');
@@ -2240,10 +2244,13 @@ const App = (() => {
   }
 
   async function deleteRecurring(id) {
-    if (!confirm('Delete this income source?')) return;
+    const r = recurring.find(x => x.id === id);
+    const label = r ? `"${r.description}"` : 'this recurring item';
+    if (!confirm(`Delete ${label}?`)) return;
     try {
       await SB.deleteRecurring(id);
       recurring = recurring.filter(r => r.id !== id);
+      renderRecurring();
       renderIncome();
     } catch (err) {
       showToast('Failed to delete recurring: ' + err.message, 'error');
@@ -2254,7 +2261,14 @@ const App = (() => {
     const r = recurring.find(r => r.id === id);
     if (!r) return;
     r.active = !r.active;
-    await SB.upsertRecurring(r);
+    try {
+      await SB.upsertRecurring(r);
+    } catch (err) {
+      r.active = !r.active;
+      showToast('Failed to update recurring: ' + err.message, 'error');
+      return;
+    }
+    renderRecurring();
     renderIncome();
   }
 
