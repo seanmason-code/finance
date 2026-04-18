@@ -1,4 +1,4 @@
-const CACHE = 'finance-v15';
+const CACHE = 'finance-v40';
 const ASSETS = ['/', '/index.html', '/css/styles.css', '/js/db.js', '/js/charts.js', '/js/ai.js', '/js/app.js'];
 
 self.addEventListener('install', e => {
@@ -14,6 +14,8 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
+  // Skip caching on localhost — always fetch fresh during development
+  if (e.request.url.includes('localhost') || e.request.url.includes('127.0.0.1')) return;
   // Don't cache API calls
   if (e.request.url.includes('anthropic.com')) return;
   e.respondWith(

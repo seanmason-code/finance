@@ -35,17 +35,33 @@ const SB = (() => {
 
   // ===== Transactions =====
   async function getTransactions() {
-    const { data, error } = await client
-      .from('transactions')
-      .select('*')
-      .order('date', { ascending: false });
-    if (error) throw error;
-    return data;
+    const PAGE = 1000;
+    let all = [], from = 0;
+    while (true) {
+      const { data, error } = await client
+        .from('transactions')
+        .select('*')
+        .order('date', { ascending: false })
+        .range(from, from + PAGE - 1);
+      if (error) throw error;
+      all = all.concat(data);
+      if (data.length < PAGE) break;
+      from += PAGE;
+    }
+    return all;
   }
 
   async function upsertTransaction(t) {
     const { error } = await client.from('transactions').upsert(t);
     if (error) throw error;
+  }
+
+  async function batchUpsertTransactions(rows, chunkSize = 200) {
+    for (let i = 0; i < rows.length; i += chunkSize) {
+      const chunk = rows.slice(i, i + chunkSize);
+      const { error } = await client.from('transactions').upsert(chunk);
+      if (error) throw error;
+    }
   }
 
   async function deleteTransaction(id) {
@@ -104,12 +120,30 @@ const SB = (() => {
     if (error) throw error;
   }
 
+  // ===== Goals =====
+  async function getGoals() {
+    const { data, error } = await client.from('goals').select('*').order('created_at');
+    if (error) throw error;
+    return data;
+  }
+
+  async function upsertGoal(g) {
+    const { error } = await client.from('goals').upsert(g);
+    if (error) throw error;
+  }
+
+  async function deleteGoal(id) {
+    const { error } = await client.from('goals').delete().eq('id', id);
+    if (error) throw error;
+  }
+
   return {
     init, get,
     signIn, signUp, signOut, getSession,
-    getTransactions, upsertTransaction, deleteTransaction,
+    getTransactions, upsertTransaction, batchUpsertTransactions, deleteTransaction,
     getBudgets, upsertBudget, deleteBudget,
     getRecurring, upsertRecurring, deleteRecurring,
     getAccounts, upsertAccount, deleteAccount,
+    getGoals, upsertGoal, deleteGoal,
   };
 })();

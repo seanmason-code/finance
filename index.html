@@ -52,7 +52,7 @@
     <div class="auth-box">
       <div class="auth-logo">$</div>
       <h1>Create Account</h1>
-      <p class="auth-subtitle">Set up your shared finance account</p>
+      <p class="auth-subtitle">Access by invitation only</p>
       <div id="signup-error" class="auth-error hidden"></div>
       <form id="form-signup">
         <label>Email</label>
@@ -90,13 +90,17 @@
           <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
           Budgets
         </a></li>
+        <li><a href="#" data-page="goals">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+          Goals
+        </a></li>
+        <li><a href="#" data-page="income">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          Income
+        </a></li>
         <li><a href="#" data-page="reports">
           <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
           Reports
-        </a></li>
-        <li><a href="#" data-page="recurring">
-          <svg viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-          Recurring
         </a></li>
         <li><a href="#" data-page="ai">
           <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
@@ -134,7 +138,13 @@
 
         <div id="pace-card"></div>
 
+        <div id="upcoming-bills-card"></div>
+
+        <div id="spend-comparison-card" class="section-card"></div>
+
         <div id="net-position-card" class="section-card net-position-card"></div>
+
+        <div id="budget-health-card"></div>
 
         <div class="stats-grid">
           <div class="stat-card income">
@@ -189,8 +199,7 @@
           <button id="btn-add-account" class="btn-primary">+ Add Account</button>
         </header>
         <div id="accounts-total-card"></div>
-        <div id="accounts-debug" style="margin:12px 0;padding:12px;background:var(--surface2,#1e1e2e);border-radius:8px;font-size:13px;color:var(--text2,#aaa);line-height:1.8"></div>
-        <div id="accounts-unmatched"></div>
+<div id="accounts-unmatched"></div>
         <div id="accounts-list"></div>
 
         <header class="page-header" style="margin-top:32px">
@@ -222,6 +231,7 @@
             <option value="">All Types</option>
             <option value="expense">Expenses</option>
             <option value="income">Income</option>
+            <option value="transfer">Transfers</option>
           </select>
           <input type="text" id="filter-search" placeholder="Search..." />
         </div>
@@ -299,14 +309,28 @@
         </div>
       </div>
 
-      <!-- Recurring Page -->
-      <div id="page-recurring" class="page">
+      <!-- Goals Page -->
+      <div id="page-goals" class="page">
         <header class="page-header">
-          <h1>Recurring</h1>
-          <button id="btn-add-recurring" class="btn-primary">+ Add Recurring</button>
+          <h1>Goals</h1>
+          <button id="btn-add-goal" class="btn-primary">+ Add Goal</button>
         </header>
-        <div class="recurring-summary" id="recurring-summary"></div>
+        <div id="goals-summary"></div>
+        <div id="goals-list"></div>
+      </div>
+
+      <!-- Income Page -->
+      <div id="page-income" class="page">
+        <header class="page-header">
+          <h1>Income</h1>
+        </header>
+        <div id="income-summary"></div>
         <div id="recurring-list"></div>
+      </div>
+
+      <!-- Recurring Page (hidden, kept for compatibility) -->
+      <div id="page-recurring" class="page" style="display:none">
+        <div class="recurring-summary" id="recurring-summary"></div>
       </div>
 
       <!-- AI Advisor Page -->
@@ -368,6 +392,12 @@
           <p class="hint">Finds transactions with the same date, description and amount and removes the extras. Safe to run anytime.</p>
           <button id="btn-remove-duplicates" class="btn-ghost">Find &amp; Remove Duplicates</button>
           <p id="duplicate-result" class="hint" style="margin-top:8px;min-height:18px;"></p>
+        </div>
+        <div class="settings-section">
+          <h3>Fix Personal Spending</h3>
+          <p class="hint">Recategorises all existing expenses from accounts -10 and -11 to Personal Spending.</p>
+          <button id="btn-fix-personal-spending" class="btn-ghost">💳 Fix Personal Spending Categories</button>
+          <p id="personal-spending-result" class="hint" style="margin-top:8px;min-height:18px;"></p>
         </div>
         <div class="settings-section">
           <h3>Find Transfers</h3>
@@ -510,10 +540,24 @@
           <span class="currency-symbol">$</span>
           <input type="number" id="line-item-amount" placeholder="0.00" step="0.01" min="0" required />
         </div>
-        <label>Due Date <span class="hint-inline">(day of month, "weekly", or leave blank)</span></label>
-        <input type="text" id="line-item-due" placeholder="e.g. 15, weekly" />
         <label>Note / Tag <span class="hint-inline">(optional)</span></label>
         <input type="text" id="line-item-note" placeholder="e.g. DD · Kiwibank" />
+        <div class="recurring-toggle-row">
+          <label class="toggle-label">
+            <input type="checkbox" id="line-item-recurring" />
+            <span>Recurring</span>
+          </label>
+        </div>
+        <div id="recurring-fields" class="hidden">
+          <label>Frequency</label>
+          <select id="line-item-frequency">
+            <option value="weekly">Weekly</option>
+            <option value="fortnightly">Fortnightly</option>
+            <option value="monthly" selected>Monthly</option>
+          </select>
+          <label>Day of Month <span class="hint-inline">(for monthly/fortnightly)</span></label>
+          <input type="text" id="line-item-due" placeholder="e.g. 15" />
+        </div>
         <label id="line-item-move-label" class="hidden">Move to Category</label>
         <select id="line-item-move-to" class="hidden">
           <option value="">— stay in current category —</option>
@@ -600,6 +644,15 @@
           </thead>
           <tbody id="import-tbody"></tbody>
         </table>
+      </div>
+      <div id="import-progress-wrap" class="hidden" style="margin:0 0 12px">
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);margin-bottom:6px">
+          <span id="import-progress-label">Saving…</span>
+          <span id="import-progress-pct">0%</span>
+        </div>
+        <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden">
+          <div id="import-progress-bar" style="height:100%;width:0%;background:var(--accent);border-radius:3px;transition:width 0.2s"></div>
+        </div>
       </div>
       <div class="modal-actions">
         <button type="button" class="btn-ghost modal-close-btn">Cancel</button>
@@ -717,6 +770,64 @@
         <button type="button" class="btn-ghost modal-close-btn">Cancel</button>
         <button type="button" class="btn-primary" id="btn-save-assigned-accounts">Save</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Goal Modal -->
+  <div id="modal-goal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2 id="modal-goal-title">Add Goal</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <form id="form-goal">
+        <input type="hidden" id="goal-id" />
+        <label>Emoji <span class="hint-inline">(optional)</span></label>
+        <input type="text" id="goal-emoji" placeholder="e.g. 🏠 ✈️ 🚗" maxlength="4" />
+        <label>Goal Name</label>
+        <input type="text" id="goal-name" placeholder="e.g. Holiday, Emergency Fund" required />
+        <label>Target Amount</label>
+        <div class="amount-input">
+          <span class="currency-symbol">$</span>
+          <input type="number" id="goal-target" placeholder="0.00" step="0.01" min="0" required />
+        </div>
+        <label>Current Amount <span class="hint-inline">(what you have so far)</span></label>
+        <div class="amount-input">
+          <span class="currency-symbol">$</span>
+          <input type="number" id="goal-current" placeholder="0.00" step="0.01" min="0" value="0" />
+        </div>
+        <label>Notes <span class="hint-inline">(optional)</span></label>
+        <input type="text" id="goal-notes" placeholder="e.g. Europe 2026" />
+        <div class="modal-actions">
+          <button type="button" class="btn-ghost modal-close-btn">Cancel</button>
+          <button type="submit" class="btn-primary">Save Goal</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Goal Contribute Modal -->
+  <div id="modal-goal-contribute" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2>Add to Goal</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <form id="form-goal-contribute">
+        <input type="hidden" id="contribute-goal-id" />
+        <p id="contribute-goal-name" style="font-weight:600;margin-bottom:12px;"></p>
+        <label>Amount to Add</label>
+        <div class="amount-input">
+          <span class="currency-symbol">$</span>
+          <input type="number" id="contribute-amount" placeholder="0.00" step="0.01" min="0.01" required />
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-ghost modal-close-btn">Cancel</button>
+          <button type="submit" class="btn-primary">Add Funds</button>
+        </div>
+      </form>
     </div>
   </div>
 

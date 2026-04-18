@@ -5,6 +5,7 @@ const Charts = (() => {
   let budgetVsActualChart = null;
   let budgetTrendChart = null;
   let spendingTrendChart = null;
+  let spendCompareChart = null;
   let topMerchantsChart = null;
 
   const CATEGORY_COLORS = [
@@ -288,16 +289,86 @@ const Charts = (() => {
     });
   }
 
+  function renderSpendCompareChart(thisCumul, lastCumul, expectedCumul, today, thisMonthName, lastMonthName) {
+    const canvas = document.getElementById('chart-spend-compare');
+    if (!canvas) return;
+    if (spendCompareChart) { spendCompareChart.destroy(); spendCompareChart = null; }
+
+    const datasets = [
+      {
+        label: thisMonthName,
+        data: thisCumul,
+        borderColor: '#6c63ff',
+        backgroundColor: 'rgba(108,99,255,0.08)',
+        borderWidth: 2,
+        pointRadius: 0,
+        tension: 0.3,
+        fill: true,
+      },
+      {
+        label: lastMonthName,
+        data: lastCumul,
+        borderColor: 'rgba(136,136,170,0.45)',
+        backgroundColor: 'transparent',
+        borderWidth: 1.5,
+        borderDash: [5, 4],
+        pointRadius: 0,
+        tension: 0.3,
+        fill: false,
+      },
+    ];
+
+    if (expectedCumul) {
+      datasets.push({
+        label: 'Expected pace',
+        data: expectedCumul,
+        borderColor: 'rgba(108,99,255,0.45)',
+        backgroundColor: 'transparent',
+        borderWidth: 1.5,
+        borderDash: [2, 3],
+        pointRadius: 0,
+        tension: 0,
+        fill: false,
+      });
+    }
+
+    spendCompareChart = new Chart(canvas, {
+      type: 'line',
+      data: { labels: Array.from({ length: today }, (_, i) => i + 1), datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: { label: (ctx) => ` ${ctx.dataset.label}: ${formatCurrency(ctx.raw)}` }
+          }
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { maxTicksLimit: 8, font: { size: 10 }, color: '#8888aa' }
+          },
+          y: {
+            grid: { color: 'rgba(42,42,69,0.5)' },
+            ticks: { callback: (v) => formatCurrency(v, true), font: { size: 10 }, color: '#8888aa' }
+          }
+        }
+      }
+    });
+  }
+
   function destroyAll() {
     if (categoryChart) { categoryChart.destroy(); categoryChart = null; }
     if (timelineChart) { timelineChart.destroy(); timelineChart = null; }
     if (budgetVsActualChart) { budgetVsActualChart.destroy(); budgetVsActualChart = null; }
     if (budgetTrendChart) { budgetTrendChart.destroy(); budgetTrendChart = null; }
     if (spendingTrendChart) { spendingTrendChart.destroy(); spendingTrendChart = null; }
+    if (spendCompareChart) { spendCompareChart.destroy(); spendCompareChart = null; }
     if (topMerchantsChart) { topMerchantsChart.destroy(); topMerchantsChart = null; }
   }
 
-  return { renderCategoryChart, renderTimelineChart, renderBudgetVsActualChart, renderBudgetTrendChart, renderSpendingTrendChart, renderTopMerchantsChart, destroyAll };
+  return { renderCategoryChart, renderTimelineChart, renderBudgetVsActualChart, renderBudgetTrendChart, renderSpendingTrendChart, renderTopMerchantsChart, renderSpendCompareChart, destroyAll };
 })();
 
 // Currency format helper (global, used by charts + app)

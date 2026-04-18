@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monthly Sync Wizard — Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0f0f1a; --bg-2: #1a1a2e; --card: #1e1e32; --card-hover: #252540;
+  --border: #2a2a45; --accent: #6c63ff; --accent-light: #8b85ff;
+  --green: #22c55e; --red: #ef4444; --yellow: #f59e0b;
+  --text: #e2e2f0; --text-muted: #8888aa; --radius: 12px;
+}
+body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); padding: 32px 16px; font-size: 15px; line-height: 1.5; }
+h1 { font-size: 13px; font-weight: 600; color: var(--text-muted); letter-spacing: 0.08em; text-transform: uppercase; text-align: center; margin-bottom: 32px; }
+
+/* Step nav */
+.steps-row { display: flex; justify-content: center; gap: 8px; margin-bottom: 48px; flex-wrap: wrap; }
+.step-pill { padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1.5px solid var(--border); color: var(--text-muted); background: var(--card); transition: all 0.2s; }
+.step-pill.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.step-pill.done { background: rgba(34,197,94,0.12); border-color: var(--green); color: var(--green); }
+
+/* Wizard card */
+.wizard { max-width: 560px; margin: 0 auto 60px; background: var(--card); border: 1px solid var(--border); border-radius: 18px; overflow: hidden; box-shadow: 0 8px 40px rgba(0,0,0,0.5); }
+.wizard-header { padding: 28px 32px 20px; border-bottom: 1px solid var(--border); }
+.wizard-step-label { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }
+.wizard-title { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+.wizard-subtitle { font-size: 13px; color: var(--text-muted); }
+
+/* Progress bar */
+.progress-bar { height: 3px; background: var(--border); }
+.progress-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.4s ease; }
+
+.wizard-body { padding: 24px 32px; }
+.wizard-footer { padding: 16px 32px 24px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); margin-top: 8px; }
+
+/* Form elements */
+.field { margin-bottom: 16px; }
+.field label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+.field input, .field select { width: 100%; background: #13131f; border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 10px 14px; font-size: 14px; font-family: inherit; outline: none; }
+.field input:focus { border-color: var(--accent); }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.field-hint { font-size: 12px; color: var(--text-muted); margin-top: 5px; }
+.input-prefix { position: relative; }
+.input-prefix span { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 14px; pointer-events: none; }
+.input-prefix input { padding-left: 26px; }
+
+/* Buttons */
+.btn { padding: 10px 22px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; font-family: inherit; transition: all 0.2s; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent-light); }
+.btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
+.btn-ghost:hover { color: var(--text); border-color: var(--text-muted); }
+.btn-skip { background: none; border: none; color: var(--text-muted); font-size: 13px; cursor: pointer; font-family: inherit; }
+.btn-skip:hover { color: var(--text); }
+
+/* Upload zone */
+.upload-zone { border: 2px dashed var(--border); border-radius: 10px; padding: 28px; text-align: center; cursor: pointer; transition: all 0.2s; margin-bottom: 12px; }
+.upload-zone:hover { border-color: var(--accent); background: rgba(108,99,255,0.05); }
+.upload-zone.has-file { border-color: var(--green); background: rgba(34,197,94,0.05); }
+.upload-icon { font-size: 28px; margin-bottom: 8px; }
+.upload-label { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+.upload-hint { font-size: 12px; color: var(--text-muted); }
+.upload-filename { font-size: 13px; color: var(--green); font-weight: 600; margin-top: 4px; }
+.upload-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* Account rows */
+.account-row { display: flex; align-items: center; gap: 12px; background: #13131f; border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; }
+.account-icon { width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+.account-icon.anz { background: rgba(239,68,68,0.15); }
+.account-icon.kb { background: rgba(34,197,94,0.15); }
+.account-name { flex: 1; }
+.account-name strong { display: block; font-size: 14px; font-weight: 600; }
+.account-name span { font-size: 12px; color: var(--text-muted); }
+.account-balance { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.account-balance input { width: 120px; background: #1a1a2e; border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 7px 10px; font-size: 14px; font-weight: 600; font-family: inherit; text-align: right; outline: none; }
+.account-balance input:focus { border-color: var(--accent); }
+.account-balance .prev { font-size: 11px; color: var(--text-muted); }
+
+/* Transaction preview */
+.txn-preview { background: #13131f; border-radius: 10px; overflow: hidden; margin-bottom: 12px; }
+.txn-preview-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+.txn-preview-header span { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+.badge-new { background: rgba(108,99,255,0.15); color: var(--accent); }
+.badge-warn { background: rgba(245,158,11,0.15); color: var(--yellow); }
+.txn-row { display: flex; justify-content: space-between; align-items: center; padding: 9px 14px; border-bottom: 1px solid rgba(42,42,69,0.5); font-size: 13px; }
+.txn-row:last-child { border-bottom: none; }
+.txn-row .desc { font-weight: 500; }
+.txn-row .cat { font-size: 11px; color: var(--text-muted); }
+.txn-row .cat.uncategorised { color: var(--yellow); }
+.txn-row .amt { font-weight: 600; }
+.txn-row .amt.expense { color: var(--red); }
+.txn-row .amt.income { color: var(--green); }
+.more-row { padding: 8px 14px; font-size: 12px; color: var(--text-muted); text-align: center; }
+
+/* Summary cards */
+.summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+.summary-card { background: #13131f; border-radius: 10px; padding: 16px; border: 1px solid var(--border); }
+.summary-card .label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+.summary-card .value { font-size: 22px; font-weight: 700; }
+.summary-card .value.green { color: var(--green); }
+.summary-card .value.red { color: var(--red); }
+.summary-card .sub { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+.summary-checklist { background: #13131f; border-radius: 10px; padding: 14px 16px; }
+.summary-check { display: flex; align-items: center; gap: 10px; padding: 6px 0; font-size: 13px; border-bottom: 1px solid rgba(42,42,69,0.4); }
+.summary-check:last-child { border-bottom: none; }
+.check-icon { font-size: 15px; }
+
+/* divider */
+.divider { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; margin: 20px 0 12px; }
+</style>
+</head>
+<body>
+
+<h1>Monthly Sync Wizard — Visual Preview</h1>
+
+<div class="steps-row">
+  <div class="step-pill done" onclick="showStep(1)">✓ 1 · Import CSVs</div>
+  <div class="step-pill done" onclick="showStep(2)">✓ 2 · Balances</div>
+  <div class="step-pill active" onclick="showStep(3)">3 · Review</div>
+  <div class="step-pill" onclick="showStep(4)">4 · Budgets</div>
+  <div class="step-pill" onclick="showStep(5)">5 · Summary</div>
+</div>
+
+<!-- STEP 1 -->
+<div class="wizard" id="step-1" style="display:none">
+  <div class="progress-bar"><div class="progress-fill" style="width:20%"></div></div>
+  <div class="wizard-header">
+    <div class="wizard-step-label">Step 1 of 5</div>
+    <div class="wizard-title">Import your bank files</div>
+    <div class="wizard-subtitle">Drop in your latest CSV exports from ANZ and Kiwibank. We'll find new transactions automatically.</div>
+  </div>
+  <div class="wizard-body">
+    <div class="upload-pair">
+      <div>
+        <div class="field"><label>ANZ</label></div>
+        <div class="upload-zone has-file">
+          <div class="upload-icon">🏦</div>
+          <div class="upload-label" style="color:var(--green)">ANZ loaded</div>
+          <div class="upload-filename">transactions-may.csv</div>
+        </div>
+      </div>
+      <div>
+        <div class="field"><label>Kiwibank</label></div>
+        <div class="upload-zone">
+          <div class="upload-icon">📂</div>
+          <div class="upload-label">Drop CSV here</div>
+          <div class="upload-hint">or click to browse</div>
+        </div>
+      </div>
+    </div>
+    <p class="field-hint">✦ Duplicates are detected automatically — safe to re-upload old files.</p>
+  </div>
+  <div class="wizard-footer">
+    <button class="btn-skip">Skip this step</button>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-ghost">Back</button>
+      <button class="btn btn-primary" onclick="showStep(2)">Next →</button>
+    </div>
+  </div>
+</div>
+
+<!-- STEP 2 -->
+<div class="wizard" id="step-2" style="display:none">
+  <div class="progress-bar"><div class="progress-fill" style="width:40%"></div></div>
+  <div class="wizard-header">
+    <div class="wizard-step-label">Step 2 of 5</div>
+    <div class="wizard-title">Update account balances</div>
+    <div class="wizard-subtitle">Enter today's balance from each account. This keeps your totals accurate.</div>
+  </div>
+  <div class="wizard-body">
+    <div class="account-row">
+      <div class="account-icon anz">🏦</div>
+      <div class="account-name">
+        <strong>ANZ — Everyday</strong>
+        <span>Cheque account · Sean</span>
+      </div>
+      <div class="account-balance">
+        <input type="text" value="3,241.50" />
+        <span class="prev">Last: $2,891.20</span>
+      </div>
+    </div>
+    <div class="account-row">
+      <div class="account-icon anz">🏦</div>
+      <div class="account-name">
+        <strong>ANZ — Savings</strong>
+        <span>Savings account · Joint</span>
+      </div>
+      <div class="account-balance">
+        <input type="text" value="12,450.00" />
+        <span class="prev">Last: $11,950.00</span>
+      </div>
+    </div>
+    <div class="account-row">
+      <div class="account-icon kb">🥝</div>
+      <div class="account-name">
+        <strong>Kiwibank — Everyday</strong>
+        <span>Cheque account · Partner</span>
+      </div>
+      <div class="account-balance">
+        <input type="text" value="" placeholder="0.00" />
+        <span class="prev">Last: $1,204.80</span>
+      </div>
+    </div>
+    <p class="field-hint" style="margin-top:12px">✦ You can add or rename accounts in Settings.</p>
+  </div>
+  <div class="wizard-footer">
+    <button class="btn-skip">Skip this step</button>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-ghost" onclick="showStep(1)">Back</button>
+      <button class="btn btn-primary" onclick="showStep(3)">Next →</button>
+    </div>
+  </div>
+</div>
+
+<!-- STEP 3 -->
+<div class="wizard" id="step-3">
+  <div class="progress-bar"><div class="progress-fill" style="width:60%"></div></div>
+  <div class="wizard-header">
+    <div class="wizard-step-label">Step 3 of 5</div>
+    <div class="wizard-title">Review new transactions</div>
+    <div class="wizard-subtitle">47 new transactions found. 6 need a category — you can fix them now or later.</div>
+  </div>
+  <div class="wizard-body">
+    <div class="txn-preview">
+      <div class="txn-preview-header">
+        <span>Needs attention</span>
+        <span class="badge badge-warn">6 uncategorised</span>
+      </div>
+      <div class="txn-row">
+        <div><div class="desc">COUNTDOWN SYLVIA PARK</div><div class="cat uncategorised">⚠ Uncategorised</div></div>
+        <div class="amt expense">−$84.30</div>
+      </div>
+      <div class="txn-row">
+        <div><div class="desc">MITRE 10 MEGA EAST TAMAKI</div><div class="cat uncategorised">⚠ Uncategorised</div></div>
+        <div class="amt expense">−$127.60</div>
+      </div>
+      <div class="txn-row">
+        <div><div class="desc">ACC LEVY</div><div class="cat uncategorised">⚠ Uncategorised</div></div>
+        <div class="amt expense">−$42.00</div>
+      </div>
+    </div>
+
+    <div class="txn-preview">
+      <div class="txn-preview-header">
+        <span>Auto-categorised</span>
+        <span class="badge badge-new">41 matched</span>
+      </div>
+      <div class="txn-row">
+        <div><div class="desc">COUNTDOWN ONLINE</div><div class="cat">Food & Dining</div></div>
+        <div class="amt expense">−$210.40</div>
+      </div>
+      <div class="txn-row">
+        <div><div class="desc">SALARY — EMPLOYER LTD</div><div class="cat">Salary</div></div>
+        <div class="amt income">+$4,200.00</div>
+      </div>
+      <div class="txn-row">
+        <div><div class="desc">Z ENERGY BOTANY</div><div class="cat">Transport</div></div>
+        <div class="amt expense">−$95.00</div>
+      </div>
+      <div class="more-row">+ 38 more auto-categorised transactions</div>
+    </div>
+  </div>
+  <div class="wizard-footer">
+    <button class="btn-skip">Fix later</button>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-ghost" onclick="showStep(2)">Back</button>
+      <button class="btn btn-primary" onclick="showStep(4)">Next →</button>
+    </div>
+  </div>
+</div>
+
+<!-- STEP 4 -->
+<div class="wizard" id="step-4" style="display:none">
+  <div class="progress-bar"><div class="progress-fill" style="width:80%"></div></div>
+  <div class="wizard-header">
+    <div class="wizard-step-label">Step 4 of 5</div>
+    <div class="wizard-title">Budget check-in</div>
+    <div class="wizard-subtitle">It's a new month. Do you want to roll over to your standard budgets, or adjust anything?</div>
+  </div>
+  <div class="wizard-body">
+    <div style="display:flex;gap:10px;margin-bottom:20px">
+      <div style="flex:1;background:rgba(108,99,255,0.1);border:1.5px solid var(--accent);border-radius:10px;padding:16px;cursor:pointer">
+        <div style="font-weight:700;margin-bottom:4px">✓ Use standard budgets</div>
+        <div style="font-size:13px;color:var(--text-muted)">Same as last month. Housing $8,621, Food $1,625, etc.</div>
+      </div>
+      <div style="flex:1;background:var(--card-hover);border:1px solid var(--border);border-radius:10px;padding:16px;cursor:pointer">
+        <div style="font-weight:700;margin-bottom:4px">✏ Adjust budgets</div>
+        <div style="font-size:13px;color:var(--text-muted)">Go to the budget page to make changes first.</div>
+      </div>
+    </div>
+
+    <div class="divider">Last month recap</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+      <div style="background:#13131f;border-radius:10px;padding:14px;border:1px solid var(--border)">
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;font-weight:600;text-transform:uppercase">Income</div>
+        <div style="font-size:18px;font-weight:700;color:var(--green)">$8,400</div>
+      </div>
+      <div style="background:#13131f;border-radius:10px;padding:14px;border:1px solid var(--border)">
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;font-weight:600;text-transform:uppercase">Spent</div>
+        <div style="font-size:18px;font-weight:700;color:var(--red)">$7,210</div>
+      </div>
+      <div style="background:#13131f;border-radius:10px;padding:14px;border:1px solid var(--border)">
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;font-weight:600;text-transform:uppercase">Saved</div>
+        <div style="font-size:18px;font-weight:700;color:var(--accent)">$1,190</div>
+      </div>
+    </div>
+  </div>
+  <div class="wizard-footer">
+    <button class="btn-skip">Skip</button>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-ghost" onclick="showStep(3)">Back</button>
+      <button class="btn btn-primary" onclick="showStep(5)">Next →</button>
+    </div>
+  </div>
+</div>
+
+<!-- STEP 5 -->
+<div class="wizard" id="step-5" style="display:none">
+  <div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div>
+  <div class="wizard-header">
+    <div class="wizard-step-label">Step 5 of 5</div>
+    <div class="wizard-title">You're all set 🎉</div>
+    <div class="wizard-subtitle">Here's your snapshot for the month ahead.</div>
+  </div>
+  <div class="wizard-body">
+    <div class="summary-grid">
+      <div class="summary-card">
+        <div class="label">Total across accounts</div>
+        <div class="value green">$17,133</div>
+        <div class="sub">↑ $1,190 from last check</div>
+      </div>
+      <div class="summary-card">
+        <div class="label">Monthly budget</div>
+        <div class="value">$14,941</div>
+        <div class="sub">Same as last month</div>
+      </div>
+      <div class="summary-card">
+        <div class="label">Spent this month</div>
+        <div class="value red">$84</div>
+        <div class="sub">3 transactions so far</div>
+      </div>
+      <div class="summary-card">
+        <div class="label">Transactions imported</div>
+        <div class="value">47</div>
+        <div class="sub">6 still need a category</div>
+      </div>
+    </div>
+
+    <div class="summary-checklist">
+      <div class="summary-check"><span class="check-icon">✅</span> ANZ CSV imported (31 transactions)</div>
+      <div class="summary-check"><span class="check-icon">⚠️</span> Kiwibank CSV — not uploaded this time</div>
+      <div class="summary-check"><span class="check-icon">✅</span> Account balances updated</div>
+      <div class="summary-check"><span class="check-icon">✅</span> Budgets set for May 2026</div>
+      <div class="summary-check"><span class="check-icon">⚠️</span> 6 transactions need categories</div>
+    </div>
+  </div>
+  <div class="wizard-footer">
+    <div></div>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-ghost" onclick="showStep(4)">Back</button>
+      <button class="btn btn-primary">Go to Dashboard →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function showStep(n) {
+  for (let i = 1; i <= 5; i++) {
+    document.getElementById('step-' + i).style.display = i === n ? 'block' : 'none';
+  }
+  document.querySelectorAll('.step-pill').forEach((p, i) => {
+    p.className = 'step-pill';
+    if (i + 1 < n) p.classList.add('done');
+    else if (i + 1 === n) p.classList.add('active');
+  });
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+showStep(1);
+</script>
+</body>
+</html>

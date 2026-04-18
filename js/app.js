@@ -5,6 +5,7 @@ const App = (() => {
   let recurring = [];
   let accounts = [];        // bank accounts (bank !== 'Service')
   let serviceAccounts = []; // service provider balances (bank === 'Service')
+  let goals = [];
   let currency = 'NZD';
   let chatHistory = [];
   let editingTxnId = null;
@@ -88,10 +89,16 @@ const App = (() => {
 
     document.getElementById('form-signup')?.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const email = document.getElementById('signup-email').value.trim();
+      const email = document.getElementById('signup-email').value.trim().toLowerCase();
       const password = document.getElementById('signup-password').value;
       const errEl = document.getElementById('signup-error');
       errEl.classList.add('hidden');
+      const ALLOWED = ['seanmason.email@gmail.com', 'jennyschafer@hotmail.co.uk'];
+      if (!ALLOWED.includes(email)) {
+        errEl.textContent = 'This app is private. Registration is not open.';
+        errEl.classList.remove('hidden');
+        return;
+      }
       try {
         await SB.signUp(email, password);
         // Auto sign in after signup
@@ -129,6 +136,7 @@ const App = (() => {
       const allAccounts = await SB.getAccounts().catch(() => []);
       accounts = allAccounts.filter(a => a.bank !== 'Service');
       serviceAccounts = allAccounts.filter(a => a.bank === 'Service');
+      goals = await SB.getGoals().catch(() => []);
     } catch (err) {
       console.error('Failed to load data:', err);
       transactions = [];
@@ -136,6 +144,7 @@ const App = (() => {
       recurring = [];
       accounts = [];
       serviceAccounts = [];
+      goals = [];
     }
 
     // Auto-seed budgets on first use if none exist
@@ -166,6 +175,7 @@ const App = (() => {
     bindCSVImport();
     bindSignOut();
     bindMobileMenu();
+    bindGoalsModal();
 
     const lastPage = localStorage.getItem('lastPage') || 'dashboard';
     navigateTo(lastPage);
@@ -222,6 +232,8 @@ const App = (() => {
     if (page === 'accounts') renderAccounts();
     if (page === 'transactions') renderTransactionsList();
     if (page === 'budgets') renderBudgets();
+    if (page === 'goals') renderGoals();
+    if (page === 'income') renderIncome();
     if (page === 'recurring') renderRecurring();
     if (page === 'reports') renderReports();
   }
@@ -250,7 +262,10 @@ const App = (() => {
     if (netWk) netWk.textContent = `${formatCurrency(net * 12 / 52)}/wk`;
 
     renderPaceCard();
+    renderUpcomingBills();
+    renderSpendComparison();
     renderNetPosition();
+    renderBudgetHealth();
     Charts.renderCategoryChart(monthTxns);
     Charts.renderTimelineChart(transactions);
     renderRecentTransactions();
@@ -289,6 +304,67 @@ const App = (() => {
     }
   }
 
+  function renderUpcomingBills() {
+    const card = document.getElementById('upcoming-bills-card');
+    if (!card) return;
+    const upcoming = dueSoonItems();
+    if (!upcoming.length) { card.innerHTML = ''; return; }
+    card.innerHTML = `
+      <div class="section-card upcoming-bills-dashboard">
+        <h3>📅 Upcoming Bills</h3>
+        ${upcoming.map(u => `
+          <div class="upcoming-bill-row${u.missed ? ' upcoming-bill-row--missed' : ''}">
+            <span class="upcoming-bill-name">${escHtml(u.name)}</span>
+            <span class="upcoming-bill-due">${u.missed ? 'missed' : u.daysUntil === 0 ? 'today' : u.daysUntil === 1 ? 'tomorrow' : `in ${u.daysUntil} days`}</span>
+            <span class="upcoming-bill-amount">${formatCurrency(u.amount)}</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  function renderBudgetHealth() {
+    const card = document.getElementById('budget-health-card');
+    if (!card || budgets.length === 0) { if (card) card.innerHTML = ''; return; }
+
+    // Deduplicate budgets by category, summing amounts
+    const budgetByCategory = {};
+    budgets.forEach(b => {
+      if (!budgetByCategory[b.category]) budgetByCategory[b.category] = 0;
+      budgetByCategory[b.category] += b.amount;
+    });
+
+    const tiles = Object.entries(budgetByCategory).map(([category, budgeted]) => {
+      const actual = getSpendForCategory(category);
+      const { label } = getCategoryWindow(category);
+      const pct = budgeted > 0 ? Math.min(actual / budgeted, 1) : 0;
+      const over = actual > budgeted;
+      const near = !over && pct >= 0.8;
+      const status = over ? 'over' : near ? 'near' : 'ok';
+      return `
+        <div class="bh-tile bh-tile--${status}" data-category="${escHtml(category)}" title="${escHtml(category)}: ${formatCurrency(actual)} of ${formatCurrency(budgeted)} (${label})">
+          <div class="bh-tile-icon">${categoryIcon(category)}</div>
+          <div class="bh-tile-name">${escHtml(category)}</div>
+          <div class="bh-tile-amount">${formatCurrency(actual)}</div>
+          <div class="bh-tile-window">${label}</div>
+        </div>`;
+    }).join('');
+
+    card.innerHTML = `
+      <div class="section-card">
+        <div class="bh-header">
+          <h3>Budget Health <span style="font-size:12px;font-weight:400;color:var(--text-muted)">per cycle</span></h3>
+          <button class="btn-ghost bh-detail-btn" id="btn-bh-detail" style="font-size:12px;padding:4px 10px;">Full breakdown →</button>
+        </div>
+        <div class="bh-grid">${tiles}</div>
+      </div>`;
+
+    card.querySelectorAll('.bh-tile').forEach(tile => {
+      tile.addEventListener('click', () => navigateTo('budgets'));
+    });
+    card.querySelector('#btn-bh-detail')?.addEventListener('click', () => navigateTo('budgets'));
+  }
+
   function renderNetPosition() {
     const card = document.getElementById('net-position-card');
     if (!card) return;
@@ -320,6 +396,146 @@ const App = (() => {
         </div>
       </div>
     `;
+  }
+
+  function renderSpendComparison() {
+    const card = document.getElementById('spend-comparison-card');
+    if (!card) return;
+
+    const now = new Date();
+    const today = now.getDate();
+    const thisYear = now.getFullYear();
+    const thisMonth = now.getMonth();
+    const lastMonthDate = new Date(thisYear, thisMonth - 1, 1);
+    const lastYear = lastMonthDate.getFullYear();
+    const lastMonth = lastMonthDate.getMonth();
+
+    function buildActualCumulative(year, month, upToDay) {
+      const key = `${year}-${String(month + 1).padStart(2, '0')}`;
+      const daily = {};
+      transactions
+        .filter(t => t.date.startsWith(key) && t.type === 'expense' && t.category !== 'Transfer')
+        .forEach(t => {
+          const d = parseInt(t.date.slice(8, 10));
+          if (d <= upToDay) daily[d] = (daily[d] || 0) + t.amount;
+        });
+      let running = 0;
+      return Array.from({ length: upToDay }, (_, i) => {
+        running += daily[i + 1] || 0;
+        return running;
+      });
+    }
+
+    // Build expected pace from recurring expenses with a day_of_month
+    function buildExpectedCumulative(upToDay) {
+      const daily = {};
+      (recurring || [])
+        .filter(r => r.active && r.type === 'expense' && r.day_of_month)
+        .forEach(r => {
+          const d = r.day_of_month;
+          if (d <= upToDay) daily[d] = (daily[d] || 0) + r.amount;
+        });
+      let running = 0;
+      return Array.from({ length: upToDay }, (_, i) => {
+        running += daily[i + 1] || 0;
+        return running;
+      });
+    }
+
+    const thisCumul = buildActualCumulative(thisYear, thisMonth, today);
+    const lastCumul = buildActualCumulative(lastYear, lastMonth, today);
+    const expectedCumul = buildExpectedCumulative(today);
+
+    const thisTotal = thisCumul[thisCumul.length - 1] || 0;
+    const lastTotal = lastCumul[lastCumul.length - 1] || 0;
+    const expectedTotal = expectedCumul[expectedCumul.length - 1] || 0;
+
+    if (thisTotal === 0 && lastTotal === 0) { card.style.display = 'none'; return; }
+    card.style.display = '';
+
+    const vsLast = lastTotal - thisTotal;
+    const vsBudget = expectedTotal > 0 ? expectedTotal - thisTotal : null;
+    const lastMonthName = lastMonthDate.toLocaleDateString('en', { month: 'long' });
+    const thisMonthName = now.toLocaleDateString('en', { month: 'long' });
+
+    // Category breakdown for "Why?" drill-down
+    function buildCategoryTotals(year, month, upToDay) {
+      const key = `${year}-${String(month + 1).padStart(2, '0')}`;
+      const totals = {};
+      transactions
+        .filter(t => t.date.startsWith(key) && t.type === 'expense' && t.category !== 'Transfer')
+        .forEach(t => {
+          const d = parseInt(t.date.slice(8, 10));
+          if (d <= upToDay) totals[t.category || 'Uncategorised'] = (totals[t.category || 'Uncategorised'] || 0) + t.amount;
+        });
+      return totals;
+    }
+
+    const vsLastBadge = `
+      <span class="spend-compare-delta ${vsLast >= 0 ? 'delta-better' : 'delta-worse'}">
+        ${vsLast >= 0 ? '▼' : '▲'} ${formatCurrency(Math.abs(vsLast), true)} vs ${lastMonthName}
+        <button class="why-btn" id="btn-why-last" title="See what drove the difference">Why?</button>
+      </span>`;
+
+    const vsBudgetBadge = vsBudget !== null ? `
+      <span class="spend-compare-delta ${vsBudget >= 0 ? 'delta-better' : 'delta-worse'}">
+        ${vsBudget >= 0 ? '▼' : '▲'} ${formatCurrency(Math.abs(vsBudget), true)} vs expected pace
+      </span>` : '';
+
+    card.innerHTML = `
+      <div class="spend-compare-inner">
+        <div class="spend-compare-header">
+          <span class="spend-compare-title">📊 Day ${today} of ${thisMonthName}</span>
+          <div class="spend-compare-badges">${vsLastBadge}${vsBudgetBadge}</div>
+        </div>
+        <div style="height:80px;position:relative;margin-top:14px;">
+          <canvas id="chart-spend-compare"></canvas>
+        </div>
+        <div class="spend-compare-legend">
+          <span class="legend-this"></span>${thisMonthName}
+          <span class="legend-last"></span>${lastMonthName}
+          ${expectedTotal > 0 ? '<span class="legend-expected"></span>Expected pace' : ''}
+        </div>
+        <div id="spend-why-panel" class="spend-why-panel hidden"></div>
+      </div>
+    `;
+
+    Charts.renderSpendCompareChart(thisCumul, lastCumul, expectedTotal > 0 ? expectedCumul : null, today, thisMonthName, lastMonthName);
+
+    document.getElementById('btn-why-last')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const panel = document.getElementById('spend-why-panel');
+      if (!panel.classList.contains('hidden')) { panel.classList.add('hidden'); return; }
+
+      const thisCats = buildCategoryTotals(thisYear, thisMonth, today);
+      const lastCats = buildCategoryTotals(lastYear, lastMonth, today);
+      const allCats = [...new Set([...Object.keys(thisCats), ...Object.keys(lastCats)])];
+
+      const diffs = allCats.map(cat => ({
+        cat,
+        thisAmt: thisCats[cat] || 0,
+        lastAmt: lastCats[cat] || 0,
+        diff: (lastCats[cat] || 0) - (thisCats[cat] || 0),
+      })).sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff)).slice(0, 7);
+
+      panel.innerHTML = `
+        <div class="why-header">vs ${lastMonthName} — by category <span class="why-sub">(day 1–${today})</span></div>
+        ${diffs.map(d => `
+          <div class="why-row">
+            <span class="why-cat">${categoryIcon(d.cat)} ${escHtml(d.cat)}</span>
+            <span class="why-amounts">
+              <span class="why-month">${thisMonthName.slice(0,3)} ${formatCurrency(d.thisAmt, true)}</span>
+              <span class="why-sep">vs</span>
+              <span class="why-month">${lastMonthName.slice(0,3)} ${formatCurrency(d.lastAmt, true)}</span>
+            </span>
+            <span class="why-delta ${d.diff >= 0 ? 'delta-better' : 'delta-worse'}">
+              ${d.diff >= 0 ? '▼' : '▲'} ${formatCurrency(Math.abs(d.diff), true)}
+            </span>
+          </div>
+        `).join('')}
+      `;
+      panel.classList.remove('hidden');
+    });
   }
 
   function renderRecentTransactions() {
@@ -360,18 +576,6 @@ const App = (() => {
 
     const now = new Date();
     const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-
-    // DEBUG: show matching status for each account
-    const debugEl = document.getElementById('accounts-debug');
-    if (debugEl) {
-      const txnIds = [...new Set(transactions.map(t => t.account).filter(Boolean))].sort();
-      const accountRows = accounts.map(a => {
-        const matched = txnIds.some(id => accNumMatches(a.account_number, id));
-        return `<div><strong>${escHtml(a.name)}</strong> — stored: <code>${escHtml(a.account_number || '(none)')}</code> — ${matched ? '✅ matched' : '❌ no match'}</div>`;
-      }).join('');
-      const txnIdList = txnIds.map(id => `<code>${escHtml(id)}</code>`).join('  ');
-      debugEl.innerHTML = `<strong>Account IDs in transactions:</strong> ${txnIdList || '(none)'}<br><br><strong>Your accounts:</strong><br>${accountRows || '(none set up)'}`;
-    }
 
     // Unmatched count banner
     const unmatchedEl = document.getElementById('accounts-unmatched');
@@ -813,7 +1017,13 @@ const App = (() => {
     let filtered = transactions.filter(t => {
       if (month && !t.date.startsWith(month)) return false;
       if (category && t.category !== category) return false;
-      if (type && t.type !== type) return false;
+      if (type === 'transfer') {
+        if (t.category !== 'Transfer') return false;
+      } else if (type === 'income') {
+        if (t.type !== 'income' || t.category === 'Transfer') return false;
+      } else if (type === 'expense') {
+        if (t.type !== 'expense' || t.category === 'Transfer') return false;
+      }
       if (search && !t.description.toLowerCase().includes(search) &&
           !t.category.toLowerCase().includes(search)) return false;
       return true;
@@ -962,6 +1172,37 @@ const App = (() => {
     'Salary','Freelance','Rental Income','Investment',
     'Gift','Reimbursements','Other Income','Transfer',
   ];
+
+  // Per-category billing windows: 0 = calendar month, N = rolling N days, undefined = default 30d
+  // Calendar month (0) for fixed bills with a monthly due date; rolling 30d for variable spend
+  const CATEGORY_WINDOWS = {
+    'mortgage': 0, 'housing': 0, 'utilities': 0, 'insurance': 0,
+    'savings': 0, 'health': 0, 'subscriptions': 0, 'transport': 0,
+    'education': 0, 'rates': 0,
+  };
+  const DEFAULT_WINDOW_DAYS = 30;
+
+  function getCategoryWindow(category) {
+    const days = CATEGORY_WINDOWS[category.toLowerCase()];
+    if (days === undefined) return { days: DEFAULT_WINDOW_DAYS, label: '30d' };
+    if (days === 0) return { days: 0, label: 'mo' };
+    return { days, label: `${days}d` };
+  }
+
+  function getSpendForCategory(category) {
+    const { days } = getCategoryWindow(category);
+    const now = new Date();
+    if (days === 0) {
+      const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      return transactions.filter(t => t.type === 'expense' && t.category === category && t.date.startsWith(thisMonth))
+        .reduce((s, t) => s + t.amount, 0);
+    }
+    const cutoff = new Date(now);
+    cutoff.setDate(cutoff.getDate() - days);
+    const cutoffStr = cutoff.toISOString().slice(0, 10);
+    return transactions.filter(t => t.type === 'expense' && t.category === category && t.date >= cutoffStr)
+      .reduce((s, t) => s + t.amount, 0);
+  }
 
   function getCustomCategories() {
     try {
@@ -1186,19 +1427,34 @@ const App = (() => {
   // ===== Budgets =====
   function budgetWeekly(amount) { return amount / 4.333; }
 
+  function isMissed(dueDay) {
+    const today = new Date().getDate();
+    return dueDay < today;
+  }
+
   function dueSoonItems() {
     const today = new Date().getDate();
-    const upcoming = [];
+    const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+    const items = [];
     budgets.forEach(b => {
       (b.items || []).forEach(item => {
         const d = parseInt(item.dueDate);
         if (!isNaN(d)) {
-          const daysUntil = d >= today ? d - today : d + new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate() - today;
-          if (daysUntil <= 7) upcoming.push({ name: item.name, amount: item.amount, daysUntil, dueDate: item.dueDate });
+          const missed = isMissed(d);
+          const daysUntil = d >= today ? d - today : d + daysInMonth - today;
+          // Show upcoming (within 7 days) and recently missed (within last 14 days)
+          const daysSinceDue = today - d;
+          if (daysUntil <= 7 || (missed && daysSinceDue <= 14)) {
+            items.push({ name: item.name, amount: item.amount, daysUntil, dueDate: item.dueDate, missed });
+          }
         }
       });
     });
-    return upcoming.sort((a, b) => a.daysUntil - b.daysUntil);
+    // Upcoming first (by days until), then missed (most recent first)
+    return items.sort((a, b) => {
+      if (a.missed !== b.missed) return a.missed ? 1 : -1;
+      return a.daysUntil - b.daysUntil;
+    });
   }
 
   function renderBudgets() {
@@ -1235,15 +1491,34 @@ const App = (() => {
         <span>Total <span class="view-label-text">${isWeekly ? 'Weekly' : 'Monthly'}</span> Budget</span>
         <strong>${formatCurrency(grandDisplay)}<span class="per-month">${viewLabel}</span></strong>
       </div>
-      ${filtered.map(b => {
+      ${(() => {
+        const now = new Date();
+        const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        const actualByCategory = {};
+        transactions.filter(t => t.type === 'expense' && t.category !== 'Transfer' && t.date.startsWith(thisMonth))
+          .forEach(t => { actualByCategory[t.category] = (actualByCategory[t.category] || 0) + t.amount; });
+        return filtered.map(b => {
         const items = b.items || [];
         const catDisplay = isWeekly ? budgetWeekly(b.amount) : b.amount;
+        const actual = actualByCategory[b.category] || 0;
+        const pct = b.amount > 0 ? actual / b.amount : 0;
+        const overBudget = actual > b.amount;
+        const nearLimit = !overBudget && pct >= 0.8;
+        const spendBadge = overBudget
+          ? `<span class="budget-status-badge over">Over by ${formatCurrency(actual - b.amount)}</span>`
+          : nearLimit
+            ? `<span class="budget-status-badge near">${Math.round(pct * 100)}% used</span>`
+            : '';
 
         const itemsHtml = items.map(item => {
           const itemDisplay = isWeekly ? budgetWeekly(item.amount) : item.amount;
-          const dueBadge = item.dueDate && item.dueDate !== 'weekly'
-            ? `<span class="due-badge">📅 ${item.dueDate}${isNaN(item.dueDate) ? '' : 'th'}</span>` : '';
-          const weeklyBadge = item.dueDate === 'weekly' ? `<span class="due-badge">🔁 weekly</span>` : '';
+          let dueBadge = '';
+          if (item.is_recurring) {
+            const freq = item.recurring_frequency || 'monthly';
+            const day = item.dueDate ? ` · ${item.dueDate}${freq !== 'weekly' && !isNaN(item.dueDate) ? 'th' : ''}` : '';
+            dueBadge = `<span class="due-badge">🔁 ${freq}${day}</span>`;
+          }
+          const weeklyBadge = '';
           const noteLine = item.note ? `<span class="line-item-note">${escHtml(item.note)}</span>` : '';
           return `
             <div class="budget-line-item">
@@ -1260,12 +1535,13 @@ const App = (() => {
             </div>`;
         }).join('');
 
-        return `<div class="budget-item">
+        return `<div class="budget-item ${overBudget ? 'budget-over' : ''}">
           <div class="budget-header">
             <button class="budget-toggle btn-ghost" data-budget-id="${b.id}">▶</button>
             <div style="flex:1">
               <div class="budget-name">${categoryIcon(b.category)} ${escHtml(b.category)}</div>
             </div>
+            ${spendBadge}
             <div class="budget-category-total">${formatCurrency(catDisplay)}<span class="per-month">${viewLabel}</span></div>
             <div class="budget-actions">
               <button class="btn-ghost budget-edit" data-id="${b.id}" style="padding:5px 10px;font-size:12px;">Edit</button>
@@ -1277,7 +1553,8 @@ const App = (() => {
             <button class="btn-ghost btn-add-line-item" data-budget-id="${b.id}" style="width:100%;margin-top:8px;font-size:13px;">+ Add item</button>
           </div>
         </div>`;
-      }).join('')}
+      }).join('');
+      })()}
     `;
 
     container.querySelectorAll('.budget-toggle').forEach(btn => {
@@ -1332,9 +1609,25 @@ const App = (() => {
   async function loadPresetBudgets() {
     if (!confirm('This will delete all existing budgets and reload the defaults. Continue?')) return;
 
-    // Delete ALL existing budgets first to clear duplicates
-    for (const b of [...budgets]) {
-      try { await SB.deleteBudget(b.id); } catch {}
+    // Fetch fresh state from DB so we delete everything, not just what's in memory
+    let existing;
+    try {
+      existing = await SB.getBudgets();
+    } catch (err) {
+      showToast('Failed to read existing budgets: ' + err.message, 'error');
+      return;
+    }
+
+    // Delete all existing rows. Abort if ANY delete fails — don't insert on top of leftovers.
+    for (const b of existing) {
+      try {
+        await SB.deleteBudget(b.id);
+      } catch (err) {
+        showToast('Failed to clear existing budgets (aborting to avoid duplicates): ' + err.message, 'error');
+        budgets = await SB.getBudgets().catch(() => budgets);
+        renderBudgets();
+        return;
+      }
     }
     budgets = [];
 
@@ -1352,9 +1645,7 @@ const App = (() => {
         await SB.upsertBudget({ id: b.id, category: b.category, amount: b.amount });
         b.items = [];
       }
-      const idx = budgets.findIndex(x => x.category === preset.category);
-      if (idx >= 0) budgets[idx] = b;
-      else budgets.push(b);
+      budgets.push(b);
       count++;
     }
     renderBudgets();
@@ -1367,6 +1658,9 @@ const App = (() => {
     document.getElementById('form-budget')?.addEventListener('submit', saveBudget);
     document.getElementById('form-line-item')?.addEventListener('submit', saveLineItem);
     document.getElementById('budget-cat-filter')?.addEventListener('change', renderBudgets);
+    document.getElementById('line-item-recurring')?.addEventListener('change', e => {
+      document.getElementById('recurring-fields').classList.toggle('hidden', !e.target.checked);
+    });
     document.getElementById('budget-view-monthly')?.addEventListener('click', () => { _budgetView = 'monthly'; document.getElementById('budget-view-monthly').classList.add('active'); document.getElementById('budget-view-weekly').classList.remove('active'); renderBudgets(); });
     document.getElementById('budget-view-weekly')?.addEventListener('click', () => { _budgetView = 'weekly'; document.getElementById('budget-view-weekly').classList.add('active'); document.getElementById('budget-view-monthly').classList.remove('active'); renderBudgets(); });
   }
@@ -1427,6 +1721,7 @@ const App = (() => {
     document.getElementById('line-item-budget-id').value = budgetId;
     document.getElementById('line-item-id').value = '';
     document.getElementById('form-line-item').reset();
+    document.getElementById('recurring-fields').classList.add('hidden');
     document.getElementById('line-item-modal-title').textContent = 'Add Item';
     document.getElementById('line-item-move-label').classList.add('hidden');
     document.getElementById('line-item-move-to').classList.add('hidden');
@@ -1442,8 +1737,12 @@ const App = (() => {
     document.getElementById('line-item-id').value = itemId;
     document.getElementById('line-item-name').value = item.name;
     document.getElementById('line-item-amount').value = item.amount;
-    document.getElementById('line-item-due').value = item.dueDate || '';
     document.getElementById('line-item-note').value = item.note || '';
+    const isRec = !!item.is_recurring;
+    document.getElementById('line-item-recurring').checked = isRec;
+    document.getElementById('recurring-fields').classList.toggle('hidden', !isRec);
+    document.getElementById('line-item-frequency').value = item.recurring_frequency || 'monthly';
+    document.getElementById('line-item-due').value = item.dueDate || '';
 
     // Populate move-to dropdown with all other categories
     const select = document.getElementById('line-item-move-to');
@@ -1465,8 +1764,10 @@ const App = (() => {
     const itemId = document.getElementById('line-item-id').value;
     const name = document.getElementById('line-item-name').value.trim();
     const amount = parseFloat(document.getElementById('line-item-amount').value);
-    const dueDate = document.getElementById('line-item-due').value.trim();
     const note = document.getElementById('line-item-note').value.trim();
+    const isRecurring = document.getElementById('line-item-recurring').checked;
+    const recurringFrequency = isRecurring ? document.getElementById('line-item-frequency').value : '';
+    const dueDate = isRecurring ? document.getElementById('line-item-due').value.trim() : '';
     const moveToBudgetId = document.getElementById('line-item-move-to').value;
 
     const budget = budgets.find(b => b.id === budgetId);
@@ -1474,7 +1775,7 @@ const App = (() => {
 
     if (!budget.items) budget.items = [];
 
-    const updatedItem = { id: itemId || crypto.randomUUID(), name, amount, dueDate, note };
+    const updatedItem = { id: itemId || crypto.randomUUID(), name, amount, dueDate, note, is_recurring: isRecurring, recurring_frequency: recurringFrequency };
 
     // Handle move to different category
     if (itemId && moveToBudgetId) {
@@ -1546,6 +1847,238 @@ const App = (() => {
       const { id, category, amount } = b;
       await SB.upsertBudget({ id, category, amount });
     }
+  }
+
+  // ===== Goals =====
+  function renderGoals() {
+    const container = document.getElementById('goals-list');
+    const summary = document.getElementById('goals-summary');
+    if (!container) return;
+
+    const totalTarget = goals.reduce((s, g) => s + g.target_amount, 0);
+    const totalSaved = goals.reduce((s, g) => s + (g.current_amount || 0), 0);
+
+    if (summary) {
+      if (goals.length === 0) { summary.innerHTML = ''; }
+      else {
+        summary.innerHTML = `
+          <div class="stats-grid" style="margin-bottom:16px">
+            <div class="stat-card income">
+              <span class="stat-label">Total Saved</span>
+              <span class="stat-value">${formatCurrency(totalSaved)}</span>
+            </div>
+            <div class="stat-card balance">
+              <span class="stat-label">Total Target</span>
+              <span class="stat-value">${formatCurrency(totalTarget)}</span>
+            </div>
+            <div class="stat-card expenses">
+              <span class="stat-label">Still Needed</span>
+              <span class="stat-value">${formatCurrency(Math.max(0, totalTarget - totalSaved))}</span>
+            </div>
+          </div>`;
+      }
+    }
+
+    if (goals.length === 0) {
+      container.innerHTML = '<div class="empty-state"><p>No goals yet. Add your first goal — holiday, emergency fund, new car, whatever you\'re saving for.</p></div>';
+      return;
+    }
+
+    container.innerHTML = goals.map(g => {
+      const pct = g.target_amount > 0 ? Math.min((g.current_amount || 0) / g.target_amount, 1) : 0;
+      const pctDisplay = Math.round(pct * 100);
+      const done = pct >= 1;
+      const remaining = Math.max(0, g.target_amount - (g.current_amount || 0));
+      return `
+        <div class="goal-card ${done ? 'goal-complete' : ''}">
+          <div class="goal-header">
+            <span class="goal-emoji">${escHtml(g.emoji || '🎯')}</span>
+            <div class="goal-info">
+              <div class="goal-name">${escHtml(g.name)}</div>
+              ${g.notes ? `<div class="goal-notes">${escHtml(g.notes)}</div>` : ''}
+            </div>
+            <div class="goal-actions">
+              ${done ? '<span class="goal-done-badge">✅ Complete</span>' : `<button class="btn-ghost goal-contribute" data-id="${g.id}" data-name="${escHtml(g.name)}" data-current="${g.current_amount || 0}">+ Add</button>`}
+              <button class="btn-ghost goal-edit" data-id="${g.id}">Edit</button>
+              <button class="btn-ghost goal-delete" data-id="${g.id}" style="color:var(--red)">Del</button>
+            </div>
+          </div>
+          <div class="goal-progress-wrap">
+            <div class="goal-progress-bar" style="width:${pctDisplay}%"></div>
+          </div>
+          <div class="goal-amounts">
+            <span>${formatCurrency(g.current_amount || 0)} saved</span>
+            <span class="goal-pct">${pctDisplay}%</span>
+            <span>${done ? 'Goal reached!' : `${formatCurrency(remaining)} to go`} · Target: ${formatCurrency(g.target_amount)}</span>
+          </div>
+        </div>`;
+    }).join('');
+
+    container.querySelectorAll('.goal-contribute').forEach(btn => {
+      btn.addEventListener('click', () => openContributeGoal(btn.dataset.id, btn.dataset.name, parseFloat(btn.dataset.current)));
+    });
+    container.querySelectorAll('.goal-edit').forEach(btn => btn.addEventListener('click', () => openEditGoal(btn.dataset.id)));
+    container.querySelectorAll('.goal-delete').forEach(btn => btn.addEventListener('click', () => deleteGoal(btn.dataset.id)));
+  }
+
+  function bindGoalsModal() {
+    document.getElementById('btn-add-goal')?.addEventListener('click', openAddGoal);
+    document.getElementById('form-goal')?.addEventListener('submit', saveGoal);
+    document.getElementById('form-goal-contribute')?.addEventListener('submit', saveContribution);
+  }
+
+  function openAddGoal() {
+    document.getElementById('goal-id').value = '';
+    document.getElementById('form-goal').reset();
+    document.getElementById('goal-current').value = '0';
+    document.getElementById('modal-goal-title').textContent = 'Add Goal';
+    document.getElementById('modal-goal').classList.remove('hidden');
+  }
+
+  function openEditGoal(id) {
+    const g = goals.find(g => g.id === id);
+    if (!g) return;
+    document.getElementById('goal-id').value = g.id;
+    document.getElementById('goal-emoji').value = g.emoji || '';
+    document.getElementById('goal-name').value = g.name;
+    document.getElementById('goal-target').value = g.target_amount;
+    document.getElementById('goal-current').value = g.current_amount || 0;
+    document.getElementById('goal-notes').value = g.notes || '';
+    document.getElementById('modal-goal-title').textContent = 'Edit Goal';
+    document.getElementById('modal-goal').classList.remove('hidden');
+  }
+
+  function openContributeGoal(id, name, current) {
+    document.getElementById('contribute-goal-id').value = id;
+    document.getElementById('contribute-goal-name').textContent = name;
+    document.getElementById('contribute-amount').value = '';
+    document.getElementById('modal-goal-contribute').classList.remove('hidden');
+  }
+
+  async function saveGoal(e) {
+    e.preventDefault();
+    const id = document.getElementById('goal-id').value || crypto.randomUUID();
+    const g = {
+      id,
+      emoji: document.getElementById('goal-emoji').value.trim() || '🎯',
+      name: document.getElementById('goal-name').value.trim(),
+      target_amount: parseFloat(document.getElementById('goal-target').value),
+      current_amount: parseFloat(document.getElementById('goal-current').value) || 0,
+      notes: document.getElementById('goal-notes').value.trim(),
+    };
+    try {
+      await SB.upsertGoal(g);
+      const idx = goals.findIndex(x => x.id === id);
+      if (idx >= 0) goals[idx] = g; else goals.push(g);
+      closeModals();
+      renderGoals();
+    } catch (err) {
+      showToast('Failed to save goal: ' + err.message, 'error');
+    }
+  }
+
+  async function saveContribution(e) {
+    e.preventDefault();
+    const id = document.getElementById('contribute-goal-id').value;
+    const amount = parseFloat(document.getElementById('contribute-amount').value);
+    const g = goals.find(g => g.id === id);
+    if (!g) return;
+    g.current_amount = (g.current_amount || 0) + amount;
+    try {
+      await SB.upsertGoal(g);
+      closeModals();
+      renderGoals();
+      showToast(`Added ${formatCurrency(amount)} to ${g.name}`);
+    } catch (err) {
+      showToast('Failed to update goal: ' + err.message, 'error');
+    }
+  }
+
+  async function deleteGoal(id) {
+    if (!confirm('Delete this goal?')) return;
+    try {
+      await SB.deleteGoal(id);
+      goals = goals.filter(g => g.id !== id);
+      renderGoals();
+    } catch (err) {
+      showToast('Failed to delete goal: ' + err.message, 'error');
+    }
+  }
+
+  // ===== Income =====
+  function renderIncome() {
+    const container = document.getElementById('recurring-list');
+    const summary = document.getElementById('income-summary');
+    if (!container) return;
+
+    const now = new Date();
+    const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastMonth = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, '0')}`;
+
+    const incomeTxns = transactions.filter(t => t.type === 'income' && t.category !== 'Transfer');
+    const thisMonthIncome = incomeTxns.filter(t => t.date.startsWith(thisMonth));
+    const lastMonthIncome = incomeTxns.filter(t => t.date.startsWith(lastMonth));
+
+    const thisTotal = thisMonthIncome.reduce((s, t) => s + t.amount, 0);
+    const lastTotal = lastMonthIncome.reduce((s, t) => s + t.amount, 0);
+
+    // Weekly avg from 3-month rolling average to smooth pay timing differences
+    const threeMonthKeys = [0, 1, 2].map(i => {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    });
+    const threeMonthTotal = incomeTxns.filter(t => threeMonthKeys.some(k => t.date.startsWith(k))).reduce((s, t) => s + t.amount, 0);
+    const weeklyAvg = (threeMonthTotal / 3) * 12 / 52;
+
+    const diff = thisTotal - lastTotal;
+
+    if (summary) summary.innerHTML = `
+      <div class="stats-grid" style="margin-bottom:16px">
+        <div class="stat-card income">
+          <span class="stat-label">This Month</span>
+          <span class="stat-value">${formatCurrency(thisTotal)}</span>
+        </div>
+        <div class="stat-card income">
+          <span class="stat-label">Last Month</span>
+          <span class="stat-value">${formatCurrency(lastTotal)}</span>
+          ${diff !== 0 ? `<span class="stat-sub" style="color:${diff >= 0 ? 'var(--green)' : 'var(--red)'}">${diff >= 0 ? '+' : ''}${formatCurrency(diff)}</span>` : ''}
+        </div>
+        <div class="stat-card income">
+          <span class="stat-label">Weekly Average</span>
+          <span class="stat-value">${formatCurrency(weeklyAvg)}</span>
+          <span class="stat-sub">based on this month</span>
+        </div>
+      </div>`;
+
+    if (thisMonthIncome.length === 0) {
+      container.innerHTML = `<div class="empty-state"><p>No income transactions this month. Import your bank CSV to see income here.</p></div>`;
+      return;
+    }
+
+    // Group by category
+    const byCategory = {};
+    thisMonthIncome.forEach(t => {
+      if (!byCategory[t.category]) byCategory[t.category] = { total: 0, txns: [] };
+      byCategory[t.category].total += t.amount;
+      byCategory[t.category].txns.push(t);
+    });
+
+    const sorted = Object.entries(byCategory).sort((a, b) => b[1].total - a[1].total);
+
+    container.innerHTML = sorted.map(([cat, { total, txns }]) => `
+      <div class="income-category-block">
+        <div class="income-cat-header">
+          <span>${categoryIcon(cat)} ${escHtml(cat)}</span>
+          <span class="income-cat-total">${formatCurrency(total)}</span>
+        </div>
+        ${txns.map(t => `
+          <div class="income-txn-row">
+            <span class="income-txn-desc">${escHtml(t.description)}</span>
+            <span class="income-txn-date">${t.date}</span>
+            <span class="income-txn-amount">${formatCurrency(t.amount)}</span>
+          </div>`).join('')}
+      </div>`).join('');
   }
 
   // ===== Recurring =====
@@ -1657,12 +2190,13 @@ const App = (() => {
   }
 
   function openAddRecurring() {
+    const defaultType = 'income';
     document.getElementById('recurring-id').value = '';
     document.getElementById('form-recurring').reset();
-    document.getElementById('recurring-type').value = 'expense';
-    document.querySelectorAll('.tab-btn-r').forEach(b => b.classList.toggle('active', b.dataset.type === 'expense'));
-    updateRecurringCategories('expense');
-    document.getElementById('modal-recurring-title').textContent = 'Add Recurring';
+    document.getElementById('recurring-type').value = defaultType;
+    document.querySelectorAll('.tab-btn-r').forEach(b => b.classList.toggle('active', b.dataset.type === defaultType));
+    updateRecurringCategories(defaultType);
+    document.getElementById('modal-recurring-title').textContent = 'Add Income Source';
     document.getElementById('modal-recurring').classList.remove('hidden');
   }
 
@@ -1699,18 +2233,18 @@ const App = (() => {
       const idx = recurring.findIndex(x => x.id === id);
       if (idx >= 0) recurring[idx] = r; else recurring.push(r);
       closeModals();
-      renderRecurring();
+      renderIncome();
     } catch (err) {
       showToast('Failed to save recurring: ' + err.message, 'error');
     }
   }
 
   async function deleteRecurring(id) {
-    if (!confirm('Delete this recurring transaction?')) return;
+    if (!confirm('Delete this income source?')) return;
     try {
       await SB.deleteRecurring(id);
       recurring = recurring.filter(r => r.id !== id);
-      renderRecurring();
+      renderIncome();
     } catch (err) {
       showToast('Failed to delete recurring: ' + err.message, 'error');
     }
@@ -1721,7 +2255,7 @@ const App = (() => {
     if (!r) return;
     r.active = !r.active;
     await SB.upsertRecurring(r);
-    renderRecurring();
+    renderIncome();
   }
 
   // ===== AI Chat =====
@@ -1880,6 +2414,45 @@ const App = (() => {
     document.getElementById('btn-clear-data')?.addEventListener('click', clearAllData);
     document.getElementById('btn-remove-duplicates')?.addEventListener('click', removeDuplicates);
     document.getElementById('btn-find-transfers')?.addEventListener('click', findAndLabelTransfers);
+    document.getElementById('btn-fix-personal-spending')?.addEventListener('click', fixPersonalSpending);
+  }
+
+  async function fixPersonalSpending() {
+    const btn = document.getElementById('btn-fix-personal-spending');
+    const result = document.getElementById('personal-spending-result');
+    const personalAccounts = CSVImport.PERSONAL_SPENDING_ACCOUNTS;
+
+    const toFix = transactions.filter(t =>
+      t.type === 'expense' &&
+      t.category !== 'Personal Spending' &&
+      t.category !== 'Transfer' &&
+      personalAccounts.some(a => t.account && t.account.includes(a.slice(-2)) && t.account.startsWith('38-9020-0211287'))
+    );
+
+    if (toFix.length === 0) {
+      result.textContent = 'Nothing to fix — all personal account expenses are already categorised correctly.';
+      return;
+    }
+
+    if (!confirm(`Recategorise ${toFix.length} transaction${toFix.length !== 1 ? 's' : ''} from accounts -10 and -11 to Personal Spending?`)) return;
+
+    btn.disabled = true;
+    result.textContent = 'Fixing…';
+    let fixed = 0;
+    for (const t of toFix) {
+      const updated = { ...t, category: 'Personal Spending' };
+      try {
+        await SB.upsertTransaction(updated);
+        const idx = transactions.findIndex(x => x.id === t.id);
+        if (idx >= 0) transactions[idx] = updated;
+        fixed++;
+      } catch (err) {
+        console.error('Failed to fix transaction:', err);
+      }
+    }
+    btn.disabled = false;
+    result.textContent = `Done — ${fixed} transaction${fixed !== 1 ? 's' : ''} updated to Personal Spending.`;
+    refreshCurrentPage();
   }
 
   function exportData() {
@@ -2219,8 +2792,12 @@ const App = (() => {
     const selected = _importRows.filter(r => r._checked).length;
     document.getElementById('import-summary').textContent =
       `${total} transactions found · ${selected} selected`;
-    document.getElementById('import-confirm-btn').textContent =
-      `Import ${selected} transaction${selected !== 1 ? 's' : ''}`;
+    const unlinked = transactions.filter(t => !t.account).length;
+    document.getElementById('import-confirm-btn').textContent = selected > 0
+      ? `Import ${selected} transaction${selected !== 1 ? 's' : ''}`
+      : unlinked > 0
+        ? `Fix ${unlinked} unlinked transaction${unlinked !== 1 ? 's' : ''}`
+        : 'Sync & update';
   }
 
   async function doImport() {
@@ -2228,11 +2805,23 @@ const App = (() => {
     const btn = document.getElementById('import-confirm-btn');
     btn.disabled = true;
 
-    const setBtnState = (label) => { btn.innerHTML = `<span class="btn-spinner"></span> ${label}`; };
-    setBtnState(`Saving 0 / ${toImport.length}`);
+    const progressWrap = document.getElementById('import-progress-wrap');
+    const progressBar = document.getElementById('import-progress-bar');
+    const progressLabel = document.getElementById('import-progress-label');
+    const progressPct = document.getElementById('import-progress-pct');
+    if (progressWrap) progressWrap.classList.remove('hidden');
+
+    const total = toImport.length;
+    const setProgress = (done) => {
+      const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+      if (progressBar) progressBar.style.width = `${pct}%`;
+      if (progressLabel) progressLabel.textContent = `Saving ${done} of ${total}`;
+      if (progressPct) progressPct.textContent = `${pct}%`;
+      btn.textContent = `${done} / ${total}`;
+    };
+    setProgress(0);
 
     let count = 0;
-    const total = toImport.length;
     for (const row of toImport) {
       const t = {
         id: crypto.randomUUID(),
@@ -2251,26 +2840,30 @@ const App = (() => {
       } catch (err) {
         console.error('Import row failed:', err);
       }
-      setBtnState(`Saving ${count} / ${total}`);
+      setProgress(count);
     }
 
     // Patch account field on existing transactions that were imported without one
     let accountsPatched = 0;
+    const patchBatch = [];
     for (const row of _importRows) {
-      if (!row._isDuplicate || !row.account) continue;
+      if (!row._isDuplicate || !row.account || row.account === 'ANZ') continue;
       const key = `${row.date}|${row.description}|${Math.round(row.amount * 100)}`;
       const existing = transactions.find(t =>
-        `${t.date}|${t.description}|${Math.round(t.amount * 100)}` === key && !t.account
+        `${t.date}|${t.description}|${Math.round(t.amount * 100)}` === key && (!t.account || t.account === 'ANZ')
       );
       if (!existing) continue;
       const updated = { ...existing, account: row.account };
+      patchBatch.push(updated);
+      const idx = transactions.findIndex(t => t.id === existing.id);
+      if (idx >= 0) transactions[idx] = updated;
+      accountsPatched++;
+    }
+    if (patchBatch.length > 0) {
       try {
-        await SB.upsertTransaction(updated);
-        const idx = transactions.findIndex(t => t.id === existing.id);
-        if (idx >= 0) transactions[idx] = updated;
-        accountsPatched++;
+        await SB.batchUpsertTransactions(patchBatch);
       } catch (err) {
-        console.error('Failed to patch account on transaction:', err);
+        console.error('Failed to batch patch accounts:', err);
       }
     }
 
@@ -2294,6 +2887,8 @@ const App = (() => {
     }
 
     btn.disabled = false;
+    btn.textContent = 'Import';
+    if (progressWrap) progressWrap.classList.add('hidden');
     closeModals();
     const txnMsg = count > 0 ? `Imported ${count} transaction${count !== 1 ? 's' : ''}` : 'No new transactions';
     const balanceMsg = balancesUpdated > 0 ? ` · ${balancesUpdated} balance${balancesUpdated !== 1 ? 's' : ''} updated` : '';

@@ -133,8 +133,11 @@ const CSVImport = (() => {
     return details;
   }
 
+  const PERSONAL_SPENDING_ACCOUNTS = ['38-9020-0211287-10', '38-9020-0211287-11'];
+
   function processANZ(rawRows, skipInternal, filename) {
     const accountFromFile = (filename || '').match(/(\d{2}-\d{4}-\d{7}-\d{2})/)?.[1] || 'ANZ';
+    const isPersonalAccount = PERSONAL_SPENDING_ACCOUNTS.includes(accountFromFile);
     return rawRows
       .filter(row => !skipInternal || !isInternalANZ(row))
       .map(row => {
@@ -142,7 +145,9 @@ const CSVImport = (() => {
         const type = amount >= 0 ? 'income' : 'expense';
         const desc = buildDescANZ(row);
         const date = parseANZDate(row['Date'] || '');
-        const category = autoCategory(desc, row['Type'] || '', amount);
+        const category = isPersonalAccount && amount < 0
+          ? 'Personal Spending'
+          : autoCategory(desc, row['Type'] || '', amount);
         const balance = row['Balance'] !== undefined ? parseFloat(row['Balance']) : null;
         return {
           date, description: desc, amount: Math.abs(amount), type, category,
@@ -249,5 +254,5 @@ const CSVImport = (() => {
     return result;
   }
 
-  return { parseCSV, processRows, categoryOptionsHTML, getLastBalances };
+  return { parseCSV, processRows, categoryOptionsHTML, getLastBalances, PERSONAL_SPENDING_ACCOUNTS };
 })();
