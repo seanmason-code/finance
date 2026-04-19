@@ -240,6 +240,7 @@ const App = (() => {
     if (page === 'recurring') renderRecurring();
     if (page === 'reports') renderReports();
     if (page === 'settings') renderRulesSettings();
+    if (page === 'categorize') renderCategorizePage();
   }
 
   // ===== Dashboard =====
@@ -273,6 +274,7 @@ const App = (() => {
     Charts.renderCategoryChart(monthTxns);
     Charts.renderTimelineChart(transactions);
     renderRecentTransactions();
+    renderTidyNudgeCard();
   }
 
   function renderPaceCard() {
@@ -772,6 +774,27 @@ const App = (() => {
 
     container.innerHTML = recent.map(t => transactionHTML(t)).join('');
     bindTransactionActions(container);
+  }
+
+  // ===== Tidy Nudge Card (Dashboard) =====
+  function renderTidyNudgeCard() {
+    const card = document.getElementById('tidy-nudge-card');
+    if (!card) return;
+    const uncatCount = leafTransactions().filter(t => !t.category || t.category === '').length;
+    const unconfCount = leafTransactions().filter(t => t.confirmed === false).length;
+    if (uncatCount === 0 && unconfCount === 0) { card.innerHTML = ''; return; }
+    card.innerHTML = `
+      <div class="tidy-nudge-card section-card">
+        ${uncatCount > 0 ? `<button class="tidy-nudge-item" data-filter="uncategorised">
+          <span class="tidy-nudge-count">${uncatCount}</span> uncategorised
+        </button>` : ''}
+        ${unconfCount > 0 ? `<button class="tidy-nudge-item" data-filter="unconfirmed">
+          <span class="tidy-nudge-count">${unconfCount}</span> unconfirmed
+        </button>` : ''}
+      </div>`;
+    card.querySelectorAll('.tidy-nudge-item').forEach(btn => {
+      btn.addEventListener('click', () => navigateTo('categorize'));
+    });
   }
 
   // ===== Accounts Page =====
