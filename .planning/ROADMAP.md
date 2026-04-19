@@ -36,6 +36,16 @@
 
 **Deliverable push:** One commit group + `vercel --prod` + sw.js cache bump.
 
+**Plans:** 6 plans (6 sequential waves)
+
+Plans:
+- [ ] 04-01-PLAN.md — Wave 0: add leafTransactions helper + bump sw.js to finance-v51 with fixed precache list
+- [ ] 04-02-PLAN.md — Wave 1: Supabase migration (parent_transaction_id, labels, confirmed, rules table) + SB.getRules/upsertRule/deleteRule
+- [ ] 04-03-PLAN.md — Wave 2: confirmed state UI + per-row confirm button (TXN-04, TXN-05)
+- [ ] 04-04-PLAN.md — Wave 3: label chip input + filter-by-label (TXN-02, TXN-03)
+- [ ] 04-05-PLAN.md — Wave 4: split modal + three-dot menu + thread leafTransactions through all totals (TXN-01)
+- [ ] 04-06-PLAN.md — Wave 5+6: apply-to-future rules + rules settings + finance-v52 cache bump + deploy (TXN-06, TXN-07)
+
 ---
 
 ### Phase 5 — Categorize Page
