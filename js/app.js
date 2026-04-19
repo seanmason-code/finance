@@ -1700,8 +1700,12 @@ const App = (() => {
   // ===== Rules (Phase 4 — TXN-06, TXN-07) =====
 
   function firstTokenKeyword(description) {
-    const first = String(description || '').trim().split(/\s+/)[0] || '';
-    return first.replace(/[^a-zA-Z]/g, '').toUpperCase();
+    const STOP_WORDS = new Set(['THE', 'A', 'AN', 'MR', 'MRS', 'MS', 'DR', 'ST', 'MT', 'NZ', 'LTD', 'LIMITED', 'INC', 'PTY']);
+    const tokens = String(description || '').trim().split(/\s+/)
+      .map(t => t.replace(/[^a-zA-Z]/g, '').toUpperCase())
+      .filter(t => t.length >= 2);
+    const meaningful = tokens.find(t => !STOP_WORDS.has(t));
+    return meaningful || tokens[0] || '';
   }
 
   function applyRulesToRow(row, rulesList) {
