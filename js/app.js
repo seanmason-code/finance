@@ -797,6 +797,72 @@ const App = (() => {
     });
   }
 
+  // ===== Categorize Page =====
+  function categorizeRowHTML(t) {
+    const icon = categoryIcon(t.category) || '?';
+    const dateStr = new Date(t.date + 'T12:00:00').toLocaleDateString('en', { day: 'numeric', month: 'short' });
+    const amtSign = t.type === 'expense' ? '−' : '+';
+    return `<div class="categorize-row" data-id="${escHtml(t.id)}">
+    <div class="txn-icon ${escHtml(t.type)}">${icon}</div>
+    <div class="txn-details">
+      <div class="txn-description">${escHtml(t.description)}</div>
+      <div class="txn-meta">${dateStr} · ${amtSign}${formatCurrency(t.amount)}</div>
+    </div>
+    <select class="categorize-select" data-id="${escHtml(t.id)}">
+      ${buildCategoryOptions(t.type, t.category)}
+    </select>
+    <button class="btn-primary categorize-save" data-id="${escHtml(t.id)}">Save</button>
+  </div>`;
+  }
+
+  async function saveInlineCategory(id, newCategory) {
+    if (!newCategory) { showToast('Please select a category', 'error'); return; }
+    const txn = transactions.find(x => x.id === id);
+    if (!txn) return;
+    const updated = { ...txn, category: newCategory };
+    try {
+      await SB.upsertTransaction(updated);
+      const idx = transactions.findIndex(x => x.id === id);
+      if (idx >= 0) transactions[idx] = updated;
+      renderCategorizePage();
+      showToast(`Categorised as ${newCategory}`);
+      setTimeout(() => maybeOfferFutureRule(updated), 80);
+    } catch (err) {
+      showToast('Failed to save: ' + err.message, 'error');
+    }
+  }
+
+  function renderCategorizePage() {
+    const list = document.getElementById('categorize-list');
+    if (!list) return;
+    const uncategorised = leafTransactions()
+      .filter(t => !t.category || t.category === '')
+      .sort((a, b) => new Date(b.date) - new Date(a.date));
+    const header = document.querySelector('#page-categorize .page-header p.hint');
+    if (header) header.textContent = `${uncategorised.length} transaction${uncategorised.length !== 1 ? 's' : ''} need a category`;
+    if (uncategorised.length === 0) {
+      list.innerHTML = `<div class="empty-state"><p>All caught up! No uncategorised transactions.</p></div>`;
+      return;
+    }
+    list.innerHTML = uncategorised.map(t => categorizeRowHTML(t)).join('');
+    list.querySelectorAll('.categorize-save').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.id;
+        const sel = list.querySelector(`.categorize-select[data-id="${id}"]`);
+        saveInlineCategory(id, sel?.value);
+      });
+    });
+    list.querySelectorAll('.categorize-select').forEach(sel => {
+      sel.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+          saveInlineCategory(sel.dataset.id, sel.value);
+        }
+      });
+      // Stop row-level click events from interfering with select
+      sel.addEventListener('click', e => e.stopPropagation());
+    });
+  }
+
   // ===== Accounts Page =====
   const ACCOUNT_COLORS = ['#6c63ff','#22c55e','#3b82f6','#f59e0b','#ef4444','#ec4899','#14b8a6','#8b5cf6'];
   const BANK_ICONS = { ANZ: '🏦', Kiwibank: '🥝', Westpac: '🔴', BNZ: '🟠', ASB: '🏧', Other: '💳' };
