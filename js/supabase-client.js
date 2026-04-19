@@ -154,10 +154,15 @@ const SB = (() => {
     if (error) throw error;
   }
 
+  async function deleteTransactionsByParent(parentId) {
+    const { error } = await client.from('transactions').delete().eq('parent_transaction_id', parentId);
+    if (error) throw error;
+  }
+
   return {
     init, get,
     signIn, signUp, signOut, getSession,
-    getTransactions, upsertTransaction, batchUpsertTransactions, deleteTransaction,
+    getTransactions, upsertTransaction, batchUpsertTransactions, deleteTransaction, deleteTransactionsByParent,
     getBudgets, upsertBudget, deleteBudget,
     getRecurring, upsertRecurring, deleteRecurring,
     getAccounts, upsertAccount, deleteAccount,

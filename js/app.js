@@ -1382,6 +1382,12 @@ const App = (() => {
     const confirmItem = menu.querySelector('[data-action="confirm"]');
     if (confirmItem) confirmItem.style.display = (t.confirmed === false) ? '' : 'none';
 
+    const unsplitItem = menu.querySelector('[data-action="unsplit"]');
+    if (unsplitItem) unsplitItem.style.display = t.parent_transaction_id ? '' : 'none';
+
+    const splitItem = menu.querySelector('[data-action="split"]');
+    if (splitItem) splitItem.style.display = t.parent_transaction_id ? 'none' : '';
+
     const rect = anchor.getBoundingClientRect();
     menu.style.top = `${rect.bottom + window.scrollY + 4}px`;
     menu.style.left = `${rect.right + window.scrollX - 140}px`;
@@ -1394,6 +1400,7 @@ const App = (() => {
         const action = item.dataset.action;
         if (action === 'edit') openEditTransaction(id);
         else if (action === 'split') openSplitModal(id);
+        else if (action === 'unsplit') unsplitTransaction(id);
         else if (action === 'confirm') confirmTransaction(id);
         else if (action === 'delete') deleteTransaction(id);
       };
@@ -1422,6 +1429,25 @@ const App = (() => {
       showToast('Confirmed');
     } catch (err) {
       showToast('Failed to confirm: ' + err.message, 'error');
+    }
+  }
+
+  // Unsplit: delete all children sharing the same parent_transaction_id so the
+  // (retained) parent reappears in the list. Works whether called on any child.
+  async function unsplitTransaction(id) {
+    const child = transactions.find(x => x.id === id);
+    if (!child || !child.parent_transaction_id) return;
+    const parentId = child.parent_transaction_id;
+    const siblings = transactions.filter(x => x.parent_transaction_id === parentId);
+    if (!confirm(`Unsplit? This will delete ${siblings.length} child row${siblings.length === 1 ? '' : 's'} and restore the original transaction.`)) return;
+    try {
+      await SB.deleteTransactionsByParent(parentId);
+      transactions = transactions.filter(x => x.parent_transaction_id !== parentId);
+      refreshCurrentPage();
+      clearAISnapshot();
+      showToast('Unsplit — original transaction restored');
+    } catch (err) {
+      showToast('Failed to unsplit: ' + err.message, 'error');
     }
   }
 
