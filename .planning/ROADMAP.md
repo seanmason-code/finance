@@ -64,6 +64,12 @@ Plans:
 
 **Deliverable push:** One commit group + `vercel --prod` + sw.js cache bump.
 
+**Plans:** 2 plans (2 sequential waves)
+
+Plans:
+- [ ] 05-01-PLAN.md — Wave 1: HTML shell (nudge card slot, #page-categorize, nav link) + renderTidyNudgeCard() + navigateTo wiring (TDY-01, TDY-02)
+- [ ] 05-02-PLAN.md — Wave 2: renderCategorizePage() + saveInlineCategory() + CSS styles + sw.js finance-v53 bump (TDY-03, TDY-04, TDY-05)
+
 ---
 
 ### Phase 6 — Budget Model Refactor
