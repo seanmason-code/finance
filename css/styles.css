@@ -2050,3 +2050,32 @@ body {
 }
 .split-remaining-row strong.over { color: var(--red); }
 .split-remaining-row strong.ok { color: var(--green); }
+
+/* ===== Phase 4: Rules table (Settings) ===== */
+.rules-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.rules-table th {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+.rules-table td {
+  padding: 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.rules-table td code {
+  background: var(--bg-2);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 12px;
+}
+.rules-table tr:last-child td { border-bottom: none; }

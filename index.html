@@ -435,6 +435,13 @@
           </div>
           <div id="custom-categories-list"></div>
         </div>
+        <div class="settings-section">
+          <h3>Auto-categorisation Rules</h3>
+          <p class="muted">Rules automatically categorise transactions on CSV import. First match wins. Delete and re-create to change order.</p>
+          <div id="rules-list-container">
+            <div id="rules-list"></div>
+          </div>
+        </div>
       </div>
 
     </main>
@@ -559,6 +566,31 @@
       <div class="modal-actions">
         <button type="button" class="btn-ghost modal-close-btn">Cancel</button>
         <button id="btn-split-save" type="button" class="btn-primary" disabled>Save Split</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Apply-to-future rule modal (Phase 4 — TXN-06) -->
+  <div id="modal-apply-future" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2>Apply to future transactions?</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <p class="hint" id="apply-future-subtitle">Also categorise future transactions matching this keyword?</p>
+
+      <label>Merchant keyword</label>
+      <input type="text" id="apply-future-keyword" placeholder="e.g. COUNTDOWN" maxlength="64" />
+      <p class="hint" style="font-size:11px;margin-top:4px;">Case-insensitive substring match against the description.</p>
+
+      <label>Category</label>
+      <div id="apply-future-category" class="hint" style="font-weight:600;padding:4px 0;"></div>
+
+      <div class="modal-actions" style="flex-wrap:wrap;gap:8px;">
+        <button type="button" class="btn-ghost modal-close-btn">Cancel</button>
+        <button type="button" class="btn-ghost" id="btn-apply-future-never">Never ask for this keyword</button>
+        <button type="button" class="btn-primary" id="btn-apply-future-save">Apply to future</button>
       </div>
     </div>
   </div>

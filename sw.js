@@ -1,4 +1,4 @@
-const CACHE = 'finance-v51';
+const CACHE = 'finance-v52';
 const ASSETS = ['/', '/index.html', '/css/styles.css', '/js/db.js', '/js/charts.js', '/js/ai.js', '/js/app.js', '/js/csv-import.js', '/js/supabase-client.js'];
 
 self.addEventListener('install', e => {

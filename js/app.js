@@ -239,6 +239,7 @@ const App = (() => {
     if (page === 'income') renderIncome();
     if (page === 'recurring') renderRecurring();
     if (page === 'reports') renderReports();
+    if (page === 'settings') renderRulesSettings();
   }
 
   // ===== Dashboard =====
@@ -1696,6 +1697,83 @@ const App = (() => {
     return { sanitise, getAllExistingLabels, setChips, getCurrentChips, attach };
   })();
 
+  // ===== Rules (Phase 4 — TXN-06, TXN-07) =====
+
+  function firstTokenKeyword(description) {
+    const first = String(description || '').trim().split(/\s+/)[0] || '';
+    return first.replace(/[^a-zA-Z]/g, '').toUpperCase();
+  }
+
+  function applyRulesToRow(row, rulesList) {
+    const desc = (row.description || '').toLowerCase();
+    for (const r of rulesList) {
+      const kw = (r.merchant_keyword || '').toLowerCase();
+      if (kw && desc.includes(kw)) return r;
+    }
+    return null;
+  }
+
+  function getNeverAskMap() {
+    try { return JSON.parse(localStorage.getItem('finance_rule_never_ask') || '{}'); }
+    catch { return {}; }
+  }
+  function setNeverAsk(keyword) {
+    const map = getNeverAskMap();
+    map[keyword.toUpperCase()] = true;
+    localStorage.setItem('finance_rule_never_ask', JSON.stringify(map));
+  }
+
+  function openApplyFutureModal(category, suggestedKeyword, description) {
+    const keyword = suggestedKeyword || firstTokenKeyword(description);
+    document.getElementById('apply-future-subtitle').textContent =
+      `Also categorise future transactions matching "${keyword}" as "${category}"?`;
+    document.getElementById('apply-future-keyword').value = keyword;
+    document.getElementById('apply-future-category').textContent = `${categoryIcon(category)} ${category}`;
+
+    const saveBtn = document.getElementById('btn-apply-future-save');
+    const neverBtn = document.getElementById('btn-apply-future-never');
+
+    saveBtn.onclick = async () => {
+      const kw = document.getElementById('apply-future-keyword').value.trim();
+      if (!kw) { showToast('Keyword cannot be empty', 'error'); return; }
+      const rule = {
+        id: crypto.randomUUID(),
+        merchant_keyword: kw,
+        category,
+      };
+      try {
+        await SB.upsertRule(rule);
+        rules.push({ ...rule, created_at: new Date().toISOString() });
+        closeModals();
+        showToast(`Rule saved: "${kw}" → ${category}`);
+        renderRulesSettings();
+      } catch (err) {
+        showToast('Failed to save rule: ' + err.message, 'error');
+      }
+    };
+
+    neverBtn.onclick = () => {
+      const kw = document.getElementById('apply-future-keyword').value.trim();
+      if (kw) setNeverAsk(kw);
+      closeModals();
+      showToast('Got it — no more prompts for this keyword.');
+    };
+
+    document.getElementById('modal-apply-future').classList.remove('hidden');
+  }
+
+  function maybeOfferFutureRule(t) {
+    const suggested = firstTokenKeyword(t.description);
+    if (!suggested) return;
+    const never = getNeverAskMap();
+    if (never[suggested]) return;
+    const existingRule = rules.find(r =>
+      (r.merchant_keyword || '').toLowerCase() === suggested.toLowerCase()
+    );
+    if (existingRule) return;
+    openApplyFutureModal(t.category, suggested, t.description);
+  }
+
   function buildCategoryOptions(type, selected = '') {
     const cats = type === 'income' ? getIncomeCategories() : getExpenseCategories();
     return `<option value="">Select category...</option>` +
@@ -1795,6 +1873,8 @@ const App = (() => {
       else transactions.push(t);
 
       // If editing category, offer to apply to all matching descriptions
+      const shouldPromptFutureRule = isEdit && t.category && !isExcludedCategory(t.category);
+
       if (isEdit) {
         const norm = s => (s || '').replace(/\s+/g, ' ').trim().toLowerCase();
         const merchantBase = s => norm(s).split(/[\/\-\d]/)[0].trim();
@@ -1817,6 +1897,19 @@ const App = (() => {
           refreshCurrentPage();
           clearAISnapshot();
           openBulkCategoryModal(t.category, exact, partial);
+          if (shouldPromptFutureRule) {
+            // Chain: after bulk modal closes (Apply or Cancel), offer the future-rule prompt.
+            const origApply = document.getElementById('btn-bulk-apply').onclick;
+            document.getElementById('btn-bulk-apply').onclick = async (ev) => {
+              if (origApply) await origApply(ev);
+              setTimeout(() => maybeOfferFutureRule(t), 80);
+            };
+            document.querySelectorAll('#modal-bulk-category .modal-close, #modal-bulk-category .modal-close-btn')
+              .forEach(el => {
+                const prev = el.onclick;
+                el.onclick = (ev) => { if (prev) prev(ev); setTimeout(() => maybeOfferFutureRule(t), 80); };
+              });
+          }
           return;
         }
       }
@@ -1824,6 +1917,7 @@ const App = (() => {
       closeModals();
       refreshCurrentPage();
       clearAISnapshot();
+      if (shouldPromptFutureRule) maybeOfferFutureRule(t);
     } catch (err) {
       showToast('Failed to save transaction: ' + err.message, 'error');
     }
@@ -2941,6 +3035,44 @@ const App = (() => {
 
     document.getElementById('btn-add-category')?.addEventListener('click', addCustomCategory);
     renderCustomCategories();
+    renderRulesSettings();
+  }
+
+  function renderRulesSettings() {
+    const container = document.getElementById('rules-list');
+    if (!container) return;
+    if (!rules || rules.length === 0) {
+      container.innerHTML = '<p class="hint">No rules yet. Edit a transaction and accept the "apply to future" prompt to create one.</p>';
+      return;
+    }
+    container.innerHTML = `
+      <table class="rules-table">
+        <thead><tr><th>Keyword</th><th>Category</th><th>Added</th><th></th></tr></thead>
+        <tbody>
+          ${rules.map(r => `
+            <tr data-id="${r.id}">
+              <td><code>${escHtml(r.merchant_keyword)}</code></td>
+              <td>${categoryIcon(r.category)} ${escHtml(r.category)}</td>
+              <td class="hint">${r.created_at ? new Date(r.created_at).toLocaleDateString('en', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</td>
+              <td><button class="btn-ghost btn-rule-delete" data-id="${r.id}" style="color:var(--red);">Delete</button></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+    container.querySelectorAll('.btn-rule-delete').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm(`Delete rule "${rules.find(r => r.id === btn.dataset.id)?.merchant_keyword}"?`)) return;
+        try {
+          await SB.deleteRule(btn.dataset.id);
+          rules = rules.filter(r => r.id !== btn.dataset.id);
+          renderRulesSettings();
+          showToast('Rule deleted');
+        } catch (err) {
+          showToast('Failed to delete rule: ' + err.message, 'error');
+        }
+      });
+    });
   }
 
   function renderCustomCategories() {
@@ -3392,6 +3524,11 @@ const App = (() => {
     const btn = document.getElementById('import-confirm-btn');
     btn.disabled = true;
 
+    // Load rules fresh — rules[] may be stale if Sean added a rule in another tab
+    let activeRules = [];
+    try { activeRules = await SB.getRules(); } catch { activeRules = rules; }
+    rules = activeRules;
+
     const progressWrap = document.getElementById('import-progress-wrap');
     const progressBar = document.getElementById('import-progress-bar');
     const progressLabel = document.getElementById('import-progress-label');
@@ -3421,6 +3558,8 @@ const App = (() => {
         notes: '',
         confirmed: false,
       };
+      const matched = applyRulesToRow(t, activeRules);
+      if (matched) t.category = matched.category;
       try {
         await SB.upsertTransaction(t);
         transactions.push(t);
