@@ -1414,6 +1414,26 @@ body {
   vertical-align: middle;
 }
 
+.txn-item--unconfirmed .txn-description,
+.txn-item--unconfirmed .txn-meta,
+.txn-item--unconfirmed .txn-amount {
+  opacity: 0.55;
+}
+.unconfirmed-badge {
+  display: inline-block;
+  font-size: 10px;
+  background: rgba(250, 204, 21, 0.18);
+  color: var(--yellow);
+  padding: 1px 5px;
+  border-radius: 4px;
+  margin-left: 6px;
+  vertical-align: middle;
+  opacity: 1;
+}
+.txn-btn.confirm {
+  color: var(--green, #22c55e);
+}
+
 /* ===== Reports Page ===== */
 .month-selector {
   display: flex;

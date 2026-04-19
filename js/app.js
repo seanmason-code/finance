@@ -1300,14 +1300,21 @@ const App = (() => {
     const icon = categoryIcon(t.category);
     const dateStr = new Date(t.date + 'T12:00:00').toLocaleDateString('en', { day: 'numeric', month: 'short' });
     const amountStr = (t.type === 'expense' ? '−' : '+') + formatCurrency(t.amount);
-    return `<div class="txn-item" data-id="${t.id}">
+    const unconfirmed = t.confirmed === false;
+    const unconfirmedClass = unconfirmed ? ' txn-item--unconfirmed' : '';
+    const unconfirmedBadge = unconfirmed ? '<span class="unconfirmed-badge">Unconfirmed</span>' : '';
+    const confirmBtn = unconfirmed
+      ? `<button class="txn-btn confirm" data-id="${t.id}" title="Confirm">✓</button>`
+      : '';
+    return `<div class="txn-item${unconfirmedClass}" data-id="${t.id}">
       <div class="txn-icon ${t.type}">${icon}</div>
       <div class="txn-details">
-        <div class="txn-description">${escHtml(t.description)}</div>
+        <div class="txn-description">${escHtml(t.description)}${unconfirmedBadge}</div>
         <div class="txn-meta">${escHtml(t.category)} · ${dateStr}${t.notes ? ' · ' + escHtml(t.notes) : ''}</div>
       </div>
       <div class="txn-amount ${t.type}">${amountStr}</div>
       <div class="txn-actions">
+        ${confirmBtn}
         <button class="txn-btn edit" data-id="${t.id}" title="Edit">✏️</button>
         <button class="txn-btn delete" data-id="${t.id}" title="Delete">🗑</button>
       </div>
@@ -1320,6 +1327,24 @@ const App = (() => {
     });
     container.querySelectorAll('.txn-btn.delete').forEach(btn => {
       btn.addEventListener('click', (e) => { e.stopPropagation(); deleteTransaction(btn.dataset.id); });
+    });
+    container.querySelectorAll('.txn-btn.confirm').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const id = btn.dataset.id;
+        const txn = transactions.find(x => x.id === id);
+        if (!txn) return;
+        const updated = { ...txn, confirmed: true };
+        try {
+          await SB.upsertTransaction(updated);
+          const idx = transactions.findIndex(x => x.id === id);
+          if (idx >= 0) transactions[idx] = updated;
+          refreshCurrentPage();
+          showToast('Confirmed');
+        } catch (err) {
+          showToast('Failed to confirm: ' + err.message, 'error');
+        }
+      });
     });
   }
 
@@ -1551,6 +1576,7 @@ const App = (() => {
     e.preventDefault();
     const id = document.getElementById('txn-id').value || crypto.randomUUID();
     const isEdit = !!document.getElementById('txn-id').value;
+    const existing = isEdit ? transactions.find(x => x.id === id) : null;
     const t = {
       id,
       type: document.getElementById('txn-type').value,
@@ -1559,6 +1585,7 @@ const App = (() => {
       category: document.getElementById('txn-category').value,
       date: document.getElementById('txn-date').value,
       notes: document.getElementById('txn-notes').value.trim(),
+      confirmed: isEdit ? (existing?.confirmed ?? true) : true,
     };
 
     try {
@@ -2839,6 +2866,7 @@ const App = (() => {
     let updated = 0;
     for (const t of candidates) {
       try {
+        // Phase 4: do NOT set confirmed here — auto-labelling a transfer is not user review
         const updatedTxn = { ...t, category: 'Transfer' };
         await SB.upsertTransaction(updatedTxn);
         const idx = transactions.findIndex(x => x.id === t.id);
@@ -2900,6 +2928,7 @@ const App = (() => {
     let updated = 0;
     for (const t of candidates) {
       try {
+        // Phase 4: do NOT set confirmed here — auto-labelling a transfer is not user review
         const updatedTxn = { ...t, category: 'Transfer' };
         await SB.upsertTransaction(updatedTxn);
         const idx = transactions.findIndex(x => x.id === t.id);
@@ -3085,6 +3114,7 @@ const App = (() => {
         category: row.category,
         account: row.account || '',
         notes: '',
+        confirmed: false,
       };
       try {
         await SB.upsertTransaction(t);
