@@ -1383,6 +1383,19 @@ const App = (() => {
   const EXCLUDED_CATEGORIES = ['Transfer', 'Work CC'];
   const isExcludedCategory = c => EXCLUDED_CATEGORIES.includes(c);
 
+  // ===== Phase 4 helpers =====
+  // A split parent is a transaction that has at least one child pointing at it.
+  // Children set parent_transaction_id to the parent's id. Pre-migration this
+  // column is undefined on every row so this returns false universally — safe
+  // to call before schema migration runs.
+  const isSplitParent = t => transactions.some(x => x.parent_transaction_id === t.id);
+
+  // All totals/aggregations MUST use this in place of `transactions` once splits
+  // ship. Pre-migration (and when no splits exist) this returns the full array
+  // unchanged. Threaded through in Wave 4 — helper lands now so Wave 1–3 code
+  // already references it safely.
+  const leafTransactions = () => transactions.filter(t => !isSplitParent(t));
+
   const DEFAULT_EXPENSE_CATEGORIES = [
     'Housing','Mortgage','Rates','Food & Dining','Transport','Transport: Fuel',
     'Transport: Parking & Tolls','Transport: Car Maintenance',

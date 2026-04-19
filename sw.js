@@ -1,5 +1,5 @@
-const CACHE = 'finance-v50';
-const ASSETS = ['/', '/index.html', '/css/styles.css', '/js/db.js', '/js/charts.js', '/js/ai.js', '/js/app.js'];
+const CACHE = 'finance-v51';
+const ASSETS = ['/', '/index.html', '/css/styles.css', '/js/db.js', '/js/charts.js', '/js/ai.js', '/js/app.js', '/js/csv-import.js', '/js/supabase-client.js'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
