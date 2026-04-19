@@ -137,6 +137,23 @@ const SB = (() => {
     if (error) throw error;
   }
 
+  // ===== Rules =====
+  async function getRules() {
+    const { data, error } = await client.from('rules').select('*').order('created_at', { ascending: true });
+    if (error) throw error;
+    return data;
+  }
+
+  async function upsertRule(r) {
+    const { error } = await client.from('rules').upsert(r);
+    if (error) throw error;
+  }
+
+  async function deleteRule(id) {
+    const { error } = await client.from('rules').delete().eq('id', id);
+    if (error) throw error;
+  }
+
   return {
     init, get,
     signIn, signUp, signOut, getSession,
@@ -145,5 +162,6 @@ const SB = (() => {
     getRecurring, upsertRecurring, deleteRecurring,
     getAccounts, upsertAccount, deleteAccount,
     getGoals, upsertGoal, deleteGoal,
+    getRules, upsertRule, deleteRule,
   };
 })();

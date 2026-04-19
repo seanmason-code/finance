@@ -6,6 +6,7 @@ const App = (() => {
   let accounts = [];        // bank accounts (bank !== 'Service')
   let serviceAccounts = []; // service provider balances (bank === 'Service')
   let goals = [];
+  let rules = [];
   let currency = 'NZD';
   let chatHistory = [];
   let editingTxnId = null;
@@ -137,6 +138,7 @@ const App = (() => {
       accounts = allAccounts.filter(a => a.bank !== 'Service');
       serviceAccounts = allAccounts.filter(a => a.bank === 'Service');
       goals = await SB.getGoals().catch(() => []);
+      rules = await SB.getRules().catch(() => []);
     } catch (err) {
       console.error('Failed to load data:', err);
       transactions = [];
@@ -145,6 +147,7 @@ const App = (() => {
       accounts = [];
       serviceAccounts = [];
       goals = [];
+      rules = [];
     }
 
     // Auto-seed budgets on first use if none exist
