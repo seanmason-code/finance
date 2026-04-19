@@ -2079,3 +2079,102 @@ body {
   font-size: 12px;
 }
 .rules-table tr:last-child td { border-bottom: none; }
+
+/* ===== Tidy Nudge Card ===== */
+.tidy-nudge-card {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.tidy-nudge-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 16px;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 13px;
+  transition: border-color 0.15s;
+}
+
+.tidy-nudge-item:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.tidy-nudge-count {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--yellow);
+  line-height: 1;
+}
+
+/* ===== Categorize Page ===== */
+.categorize-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.categorize-row .txn-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.categorize-row .txn-description {
+  font-size: 14px;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.categorize-row .txn-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.categorize-select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: #fff;
+  font-size: 13px;
+  padding: 6px 10px;
+  min-width: 160px;
+  cursor: pointer;
+}
+
+.categorize-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.categorize-save {
+  font-size: 12px;
+  padding: 6px 14px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.page-header .hint {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 4px 0 0;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--text-muted);
+}
