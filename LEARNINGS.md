@@ -18,6 +18,18 @@ Every frontend change requires bumping `finance-vN` in `sw.js`. Without it, user
 
 ---
 
+## Supabase auto-enables RLS on newly-created tables
+
+**What happened:** Phase 4 migration created the `rules` table via `CREATE TABLE IF NOT EXISTS`. App then failed all inserts with `new row violates row-level security policy for table "rules"`.
+
+**Why:** Supabase's default is RLS-enabled-by-default on any new table. With no policies defined, the default deny-all blocks every client-side insert. In the Table Editor this shows as "UNRESTRICTED" — which is misleading; it actually means RLS is ON but no policies exist.
+
+**Fix:** Add `ALTER TABLE rules DISABLE ROW LEVEL SECURITY;` in the migration file immediately after `CREATE TABLE`. Matches the joint-account model (no per-user isolation needed).
+
+**Next time:** When using Supabase and NOT wanting RLS (joint/shared accounts), every `CREATE TABLE` needs a matching `ALTER TABLE ... DISABLE ROW LEVEL SECURITY;` in the same migration. Don't assume a table with "no policies" is open — it's the opposite.
+
+---
+
 ## Supabase RLS blocks anon key queries
 
 Direct REST queries with the anon key return `[]`, not an error. Requires a user auth token. Don't try to query Supabase directly from the browser console to debug — use the app's own authenticated client or add diagnostic output inside the app.

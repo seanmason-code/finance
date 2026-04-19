@@ -32,11 +32,15 @@ CREATE INDEX IF NOT EXISTS idx_transactions_labels
   ON transactions USING GIN (labels);
 
 -- 4. Rules table (no user_id, no RLS — joint account).
+-- Supabase enables RLS by default on newly-created tables; explicitly DISABLE
+-- so inserts from the client side don't get blocked by a policy-less RLS lockdown.
 CREATE TABLE IF NOT EXISTS rules (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   merchant_keyword text NOT NULL,
   category text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now()
 );
+
+ALTER TABLE rules DISABLE ROW LEVEL SECURITY;
 
 CREATE INDEX IF NOT EXISTS idx_rules_created_at ON rules(created_at);
