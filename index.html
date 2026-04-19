@@ -541,6 +541,36 @@
     </div>
   </div>
 
+  <!-- Split Transaction Modal (Phase 4 — TXN-01) -->
+  <div id="modal-split-transaction" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-box modal-box-wide">
+      <div class="modal-header">
+        <h2>Split Transaction</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div id="split-parent-summary" class="split-parent-summary"></div>
+      <div id="split-children"></div>
+      <button id="btn-split-add-child" type="button" class="btn-ghost" style="width:100%;margin-top:8px;">+ Add another split</button>
+      <div class="split-remaining-row">
+        <span>Remaining to allocate:</span>
+        <strong id="split-remaining">$0.00</strong>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-ghost modal-close-btn">Cancel</button>
+        <button id="btn-split-save" type="button" class="btn-primary" disabled>Save Split</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row three-dot menu popover (Phase 4 — shared by Edit/Split/Delete/Confirm) -->
+  <div id="txn-row-menu" class="txn-row-menu hidden">
+    <button type="button" class="txn-row-menu-item" data-action="edit">Edit</button>
+    <button type="button" class="txn-row-menu-item" data-action="split">Split</button>
+    <button type="button" class="txn-row-menu-item" data-action="confirm">Confirm</button>
+    <button type="button" class="txn-row-menu-item danger" data-action="delete">Delete</button>
+  </div>
+
   <!-- Line Item Modal -->
   <div id="modal-line-item" class="modal hidden">
     <div class="modal-backdrop"></div>

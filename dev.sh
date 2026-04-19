@@ -9,9 +9,11 @@ python3 server.py &
 
 sleep 1
 
-echo "Starting live reload on http://localhost:3000"
+echo "Starting live reload on http://localhost:4000"
 browser-sync start \
   --proxy "localhost:8090" \
+  --port 4000 \
+  --ui-port 4001 \
   --files "*.html,css/**,js/**" \
   --no-notify \
   --open

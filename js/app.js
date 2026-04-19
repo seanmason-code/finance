@@ -245,7 +245,7 @@ const App = (() => {
   function renderDashboard() {
     const now = new Date();
     const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const monthTxns = transactions.filter(t => t.date.startsWith(thisMonth));
+    const monthTxns = leafTransactions().filter(t => t.date.startsWith(thisMonth));
 
     const income = monthTxns.filter(t => t.type === 'income' && !isExcludedCategory(t.category)).reduce((s, t) => s + t.amount, 0);
     const expenses = monthTxns.filter(t => t.type === 'expense' && !isExcludedCategory(t.category)).reduce((s, t) => s + t.amount, 0);
@@ -284,7 +284,7 @@ const App = (() => {
     cutoff.setDate(cutoff.getDate() - 31);
     const cutoffStr = cutoff.toISOString().slice(0, 10);
 
-    const rolling = transactions.filter(t => t.date >= cutoffStr && !isExcludedCategory(t.category));
+    const rolling = leafTransactions().filter(t => t.date >= cutoffStr && !isExcludedCategory(t.category));
     const income = rolling.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
     const expenses = rolling.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
 
@@ -432,7 +432,7 @@ const App = (() => {
   // keyword if it matches any Salary transactions, otherwise falls back to any
   // Salary-category income deduped to one per date.
   function findPaydays(todayStr) {
-    const salary = transactions.filter(t => t.type === 'income' && t.category === 'Salary' && t.date <= todayStr);
+    const salary = leafTransactions().filter(t => t.type === 'income' && t.category === 'Salary' && t.date <= todayStr);
     const needle = PAY_CYCLE_KEYWORD.trim().toLowerCase();
     let source = needle
       ? salary.filter(t => (t.description || '').toLowerCase().includes(needle))
@@ -451,13 +451,13 @@ const App = (() => {
     const daysSpan = daysBetween(startStr, endStr);
     const anchorNeedle = PAY_CYCLE_KEYWORD.trim().toLowerCase();
     const daily = {};
-    transactions
+    leafTransactions()
       .filter(t => t.type === 'expense' && !isExcludedCategory(t.category) && t.date >= startStr && t.date <= endStr)
       .forEach(t => {
         const offset = daysBetween(startStr, t.date);
         daily[offset] = (daily[offset] || 0) + t.amount;
       });
-    transactions
+    leafTransactions()
       .filter(t => {
         if (t.type !== 'income' || isExcludedCategory(t.category)) return false;
         if (t.date < startStr || t.date > endStr) return false;
@@ -525,13 +525,13 @@ const App = (() => {
       if (cycleLen <= 0) continue;
       const endStr = addDays(start, cycleLen - 1);
       const daily = {};
-      transactions
+      leafTransactions()
         .filter(t => t.type === 'expense' && !isExcludedCategory(t.category) && t.date >= start && t.date <= endStr)
         .forEach(t => {
           const offset = daysBetween(start, t.date);
           daily[offset] = (daily[offset] || 0) + t.amount;
         });
-      transactions
+      leafTransactions()
         .filter(t => {
           if (t.type !== 'income' || isExcludedCategory(t.category)) return false;
           if (t.date < start || t.date > endStr) return false;
@@ -701,7 +701,7 @@ const App = (() => {
     function buildActualCumulative(year, month, upToDay) {
       const key = `${year}-${String(month + 1).padStart(2, '0')}`;
       const daily = {};
-      transactions
+      leafTransactions()
         .filter(t => t.date.startsWith(key) && t.type === 'expense' && !isExcludedCategory(t.category))
         .forEach(t => {
           const d = parseInt(t.date.slice(8, 10));
@@ -760,7 +760,7 @@ const App = (() => {
 
   function renderRecentTransactions() {
     const container = document.getElementById('recent-transactions');
-    const recent = [...transactions]
+    const recent = [...leafTransactions()]
       .sort((a, b) => b.date.localeCompare(a.date))
       .slice(0, 5);
 
@@ -811,8 +811,8 @@ const App = (() => {
     }
 
     const totalBalance = accounts.reduce((s, a) => s + (a.balance || 0), 0);
-    const monthIncome = transactions.filter(t => t.type === 'income' && !isExcludedCategory(t.category) && t.date.startsWith(thisMonth)).reduce((s, t) => s + t.amount, 0);
-    const monthExpense = transactions.filter(t => t.type === 'expense' && !isExcludedCategory(t.category) && t.date.startsWith(thisMonth)).reduce((s, t) => s + t.amount, 0);
+    const monthIncome = leafTransactions().filter(t => t.type === 'income' && !isExcludedCategory(t.category) && t.date.startsWith(thisMonth)).reduce((s, t) => s + t.amount, 0);
+    const monthExpense = leafTransactions().filter(t => t.type === 'expense' && !isExcludedCategory(t.category) && t.date.startsWith(thisMonth)).reduce((s, t) => s + t.amount, 0);
 
     totalEl.innerHTML = `
       <div class="accounts-total">
@@ -951,7 +951,7 @@ const App = (() => {
   function accountCardHTML(a, thisMonth) {
     const color = a.color || '#6c63ff';
     const icon = BANK_ICONS[a.bank] || '💳';
-    const txns = transactions.filter(t => t.account && accNumMatches(a.account_number, t.account) && t.date.startsWith(thisMonth));
+    const txns = leafTransactions().filter(t => t.account && accNumMatches(a.account_number, t.account) && t.date.startsWith(thisMonth));
     const monthIn = txns.filter(t => t.type === 'income' && !isExcludedCategory(t.category)).reduce((s, t) => s + t.amount, 0);
     const monthOut = txns.filter(t => t.type === 'expense' && !isExcludedCategory(t.category)).reduce((s, t) => s + t.amount, 0);
 
@@ -1234,9 +1234,9 @@ const App = (() => {
     const category = document.getElementById('filter-category').value;
     const type = document.getElementById('filter-type').value;
     const search = document.getElementById('filter-search').value.toLowerCase();
-    const label = document.getElementById('filter-label').value;
+    const label = document.getElementById('filter-label')?.value || '';
 
-    let filtered = transactions.filter(t => {
+    let filtered = leafTransactions().filter(t => {
       if (month && !t.date.startsWith(month)) return false;
       if (category && t.category !== category) return false;
       if (type === 'transfer') {
@@ -1292,7 +1292,7 @@ const App = (() => {
   function populateCategoryFilter() {
     const select = document.getElementById('filter-category');
     if (!select) return;
-    const used = [...new Set(transactions.map(t => t.category).filter(Boolean))].sort();
+    const used = [...new Set(leafTransactions().map(t => t.category).filter(Boolean))].sort();
     const current = select.value;
     select.innerHTML = '<option value="">All Categories</option>' +
       used.map(c => `<option value="${c}">${categoryIcon(c)} ${escHtml(c)}</option>`).join('');
@@ -1303,7 +1303,7 @@ const App = (() => {
     const select = document.getElementById('filter-label');
     if (!select) return;
     const labels = new Set();
-    transactions.forEach(t => {
+    leafTransactions().forEach(t => {
       if (Array.isArray(t.labels)) t.labels.forEach(l => l && labels.add(l));
     });
     const sorted = [...labels].sort();
@@ -1335,6 +1335,7 @@ const App = (() => {
         ${confirmBtn}
         <button class="txn-btn edit" data-id="${t.id}" title="Edit">✏️</button>
         <button class="txn-btn delete" data-id="${t.id}" title="Delete">🗑</button>
+        <button class="txn-btn more" data-id="${t.id}" title="More">⋮</button>
       </div>
     </div>`;
   }
@@ -1364,6 +1365,64 @@ const App = (() => {
         }
       });
     });
+    container.querySelectorAll('.txn-btn.more').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        showRowMenu(btn, btn.dataset.id);
+      });
+    });
+  }
+
+  // ===== Three-dot row menu (Phase 4 — shared by Edit/Split/Confirm/Delete) =====
+  function showRowMenu(anchor, id) {
+    const menu = document.getElementById('txn-row-menu');
+    const t = transactions.find(x => x.id === id);
+    if (!t || !menu) return;
+
+    const confirmItem = menu.querySelector('[data-action="confirm"]');
+    if (confirmItem) confirmItem.style.display = (t.confirmed === false) ? '' : 'none';
+
+    const rect = anchor.getBoundingClientRect();
+    menu.style.top = `${rect.bottom + window.scrollY + 4}px`;
+    menu.style.left = `${rect.right + window.scrollX - 140}px`;
+    menu.classList.remove('hidden');
+
+    menu.querySelectorAll('.txn-row-menu-item').forEach(item => {
+      item.onclick = (e) => {
+        e.stopPropagation();
+        menu.classList.add('hidden');
+        const action = item.dataset.action;
+        if (action === 'edit') openEditTransaction(id);
+        else if (action === 'split') openSplitModal(id);
+        else if (action === 'confirm') confirmTransaction(id);
+        else if (action === 'delete') deleteTransaction(id);
+      };
+    });
+
+    setTimeout(() => {
+      const onAway = (ev) => {
+        if (!menu.contains(ev.target)) {
+          menu.classList.add('hidden');
+          document.removeEventListener('click', onAway);
+        }
+      };
+      document.addEventListener('click', onAway);
+    }, 0);
+  }
+
+  async function confirmTransaction(id) {
+    const txn = transactions.find(x => x.id === id);
+    if (!txn) return;
+    const updated = { ...txn, confirmed: true };
+    try {
+      await SB.upsertTransaction(updated);
+      const idx = transactions.findIndex(x => x.id === id);
+      if (idx >= 0) transactions[idx] = updated;
+      refreshCurrentPage();
+      showToast('Confirmed');
+    } catch (err) {
+      showToast('Failed to confirm: ' + err.message, 'error');
+    }
   }
 
   const PRESET_BUDGETS = [
@@ -1476,13 +1535,13 @@ const App = (() => {
     const now = new Date();
     if (days === 0) {
       const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-      return transactions.filter(t => t.type === 'expense' && t.category === category && t.date.startsWith(thisMonth))
+      return leafTransactions().filter(t => t.type === 'expense' && t.category === category && t.date.startsWith(thisMonth))
         .reduce((s, t) => s + t.amount, 0);
     }
     const cutoff = new Date(now);
     cutoff.setDate(cutoff.getDate() - days);
     const cutoffStr = cutoff.toISOString().slice(0, 10);
-    return transactions.filter(t => t.type === 'expense' && t.category === category && t.date >= cutoffStr)
+    return leafTransactions().filter(t => t.type === 'expense' && t.category === category && t.date >= cutoffStr)
       .reduce((s, t) => s + t.amount, 0);
   }
 
@@ -1756,6 +1815,111 @@ const App = (() => {
     }
   }
 
+  // ===== Split Transaction (Phase 4 — TXN-01) =====
+  function openSplitModal(parentId) {
+    const parent = transactions.find(x => x.id === parentId);
+    if (!parent) return;
+    if (parent.parent_transaction_id) {
+      showToast('Already a split child — split the parent instead.', 'error');
+      return;
+    }
+    if (isSplitParent(parent)) {
+      showToast('Already split. Delete the parent to undo.', 'error');
+      return;
+    }
+
+    const summary = document.getElementById('split-parent-summary');
+    summary.innerHTML = `
+      <div><strong>${escHtml(parent.description)}</strong></div>
+      <div class="hint">${parent.date} · ${formatCurrency(parent.amount)} · ${escHtml(parent.category || 'uncategorised')}</div>
+    `;
+
+    const childrenEl = document.getElementById('split-children');
+    childrenEl.innerHTML = '';
+
+    const recalcRemaining = () => {
+      const cents = [...childrenEl.querySelectorAll('.split-child-amount')]
+        .map(i => Math.round((parseFloat(i.value) || 0) * 100));
+      const totalCents = cents.reduce((s, c) => s + c, 0);
+      const parentCents = Math.round(parent.amount * 100);
+      const remainingCents = parentCents - totalCents;
+      const el = document.getElementById('split-remaining');
+      el.textContent = formatCurrency(remainingCents / 100);
+      el.classList.remove('ok', 'over');
+      if (remainingCents === 0 && cents.length >= 2) {
+        el.classList.add('ok');
+        document.getElementById('btn-split-save').disabled = false;
+      } else {
+        if (remainingCents < 0) el.classList.add('over');
+        document.getElementById('btn-split-save').disabled = true;
+      }
+    };
+
+    const addChild = (prefillAmount = '') => {
+      const cid = crypto.randomUUID();
+      const row = document.createElement('div');
+      row.className = 'split-child-row';
+      row.dataset.cid = cid;
+      row.innerHTML = `
+        <input type="text" class="split-child-desc" placeholder="Description" value="${escHtml(parent.description)}" />
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+          <div class="amount-input" style="margin:0;"><input type="number" class="split-child-amount" step="0.01" min="0" placeholder="0.00" value="${prefillAmount}" /></div>
+          <select class="split-child-category">${buildCategoryOptions(parent.type, parent.category)}</select>
+        </div>
+        <button type="button" class="btn-split-remove" aria-label="Remove">×</button>
+      `;
+      childrenEl.appendChild(row);
+      row.querySelector('.btn-split-remove').onclick = () => {
+        row.remove();
+        recalcRemaining();
+      };
+      row.querySelector('.split-child-amount').oninput = recalcRemaining;
+    };
+
+    const half = (parent.amount / 2).toFixed(2);
+    addChild(half);
+    addChild(half);
+    recalcRemaining();
+
+    document.getElementById('btn-split-add-child').onclick = () => { addChild(''); recalcRemaining(); };
+    document.getElementById('btn-split-save').onclick = () => saveSplit(parent);
+
+    document.getElementById('modal-split-transaction').classList.remove('hidden');
+  }
+
+  async function saveSplit(parent) {
+    const childrenEl = document.getElementById('split-children');
+    const rows = [...childrenEl.querySelectorAll('.split-child-row')];
+    const children = rows.map(row => ({
+      id: crypto.randomUUID(),
+      parent_transaction_id: parent.id,
+      date: parent.date,
+      type: parent.type,
+      account: parent.account || '',
+      description: row.querySelector('.split-child-desc').value.trim() || parent.description,
+      amount: parseFloat(row.querySelector('.split-child-amount').value),
+      category: row.querySelector('.split-child-category').value,
+      notes: '',
+      labels: [],
+      confirmed: true,
+    }));
+    const sumCents = children.reduce((s, c) => s + Math.round(c.amount * 100), 0);
+    if (sumCents !== Math.round(parent.amount * 100)) {
+      showToast('Children do not sum to parent — cannot save.', 'error');
+      return;
+    }
+    try {
+      await SB.batchUpsertTransactions(children);
+      transactions.push(...children);
+      closeModals();
+      refreshCurrentPage();
+      clearAISnapshot();
+      showToast(`Split into ${children.length} children`);
+    } catch (err) {
+      showToast('Failed to save split: ' + err.message, 'error');
+    }
+  }
+
   // ===== Bulk Category Modal =====
   function openBulkCategoryModal(category, exact, partial) {
     const list = document.getElementById('bulk-cat-list');
@@ -1876,7 +2040,7 @@ const App = (() => {
         const now = new Date();
         const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
         const actualByCategory = {};
-        transactions.filter(t => t.type === 'expense' && !isExcludedCategory(t.category) && t.date.startsWith(thisMonth))
+        leafTransactions().filter(t => t.type === 'expense' && !isExcludedCategory(t.category) && t.date.startsWith(thisMonth))
           .forEach(t => { actualByCategory[t.category] = (actualByCategory[t.category] || 0) + t.amount; });
         return filtered.map(b => {
         const items = b.items || [];
@@ -2397,7 +2561,7 @@ const App = (() => {
     const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const lastMonth = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, '0')}`;
 
-    const incomeTxns = transactions.filter(t => t.type === 'income' && !isExcludedCategory(t.category));
+    const incomeTxns = leafTransactions().filter(t => t.type === 'income' && !isExcludedCategory(t.category));
     const thisMonthIncome = incomeTxns.filter(t => t.date.startsWith(thisMonth));
     const lastMonthIncome = incomeTxns.filter(t => t.date.startsWith(lastMonth));
 
