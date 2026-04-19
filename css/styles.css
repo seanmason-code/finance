@@ -1746,6 +1746,70 @@ body {
 }
 .tag-remove:hover { color: #ef4444; }
 
+/* ===== Phase 4: Label chip input ===== */
+.chip-input {
+  position: relative;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px 4px;
+  min-height: 42px;
+}
+.chip-input .chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.chip-input #txn-label-text {
+  border: none;
+  background: transparent;
+  color: var(--text);
+  padding: 6px 4px;
+  font-size: 13px;
+  outline: none;
+  width: 100%;
+  margin-top: 4px;
+}
+.chip-suggestions {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-top: 4px;
+  max-height: 180px;
+  overflow-y: auto;
+  z-index: 10;
+  padding: 4px;
+}
+.chip-suggestions.hidden { display: none; }
+.chip-suggest {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  padding: 6px 10px;
+  font-size: 13px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.chip-suggest:hover { background: var(--bg-2); }
+
+.txn-label-chip {
+  display: inline-block;
+  font-size: 10px;
+  background: rgba(108, 99, 255, 0.15);
+  color: var(--primary, #6c63ff);
+  padding: 1px 6px;
+  border-radius: 999px;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
 /* Spend comparison card */
 .spend-compare-inner { padding: 18px 22px; }
 .spend-compare-header {

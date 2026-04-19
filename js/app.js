@@ -1212,6 +1212,7 @@ const App = (() => {
   // ===== Transactions Page =====
   function renderTransactionsList() {
     populateMonthFilter();
+    populateLabelFilter();
     applyFilters();
   }
 
@@ -1233,6 +1234,7 @@ const App = (() => {
     const category = document.getElementById('filter-category').value;
     const type = document.getElementById('filter-type').value;
     const search = document.getElementById('filter-search').value.toLowerCase();
+    const label = document.getElementById('filter-label').value;
 
     let filtered = transactions.filter(t => {
       if (month && !t.date.startsWith(month)) return false;
@@ -1246,6 +1248,7 @@ const App = (() => {
       }
       if (search && !t.description.toLowerCase().includes(search) &&
           !t.category.toLowerCase().includes(search)) return false;
+      if (label && !(Array.isArray(t.labels) && t.labels.includes(label))) return false;
       return true;
     }).sort((a, b) => b.date.localeCompare(a.date));
 
@@ -1278,11 +1281,12 @@ const App = (() => {
   }
 
   function bindFilters() {
-    ['filter-month', 'filter-category', 'filter-type'].forEach(id => {
+    ['filter-month', 'filter-category', 'filter-type', 'filter-label'].forEach(id => {
       document.getElementById(id)?.addEventListener('change', applyFilters);
     });
     document.getElementById('filter-search')?.addEventListener('input', applyFilters);
     populateCategoryFilter();
+    populateLabelFilter();
   }
 
   function populateCategoryFilter() {
@@ -1293,6 +1297,20 @@ const App = (() => {
     select.innerHTML = '<option value="">All Categories</option>' +
       used.map(c => `<option value="${c}">${categoryIcon(c)} ${escHtml(c)}</option>`).join('');
     if (current) select.value = current;
+  }
+
+  function populateLabelFilter() {
+    const select = document.getElementById('filter-label');
+    if (!select) return;
+    const labels = new Set();
+    transactions.forEach(t => {
+      if (Array.isArray(t.labels)) t.labels.forEach(l => l && labels.add(l));
+    });
+    const sorted = [...labels].sort();
+    const current = select.value;
+    select.innerHTML = '<option value="">All Labels</option>' +
+      sorted.map(l => `<option value="${escHtml(l)}">${escHtml(l)}</option>`).join('');
+    if (current && sorted.includes(current)) select.value = current;
   }
 
   // ===== Transaction HTML =====
@@ -1310,7 +1328,7 @@ const App = (() => {
       <div class="txn-icon ${t.type}">${icon}</div>
       <div class="txn-details">
         <div class="txn-description">${escHtml(t.description)}${unconfirmedBadge}</div>
-        <div class="txn-meta">${escHtml(t.category)} · ${dateStr}${t.notes ? ' · ' + escHtml(t.notes) : ''}</div>
+        <div class="txn-meta">${escHtml(t.category)} · ${dateStr}${t.notes ? ' · ' + escHtml(t.notes) : ''}${(Array.isArray(t.labels) && t.labels.length) ? ' · ' + t.labels.map(l => `<span class="txn-label-chip">${escHtml(l)}</span>`).join(' ') : ''}</div>
       </div>
       <div class="txn-amount ${t.type}">${amountStr}</div>
       <div class="txn-actions">
@@ -1503,6 +1521,96 @@ const App = (() => {
     return icons[category] || '💳';
   }
 
+  // ===== Label chip input (Phase 4 — TXN-02) =====
+  // Manages the chip list inside #txn-labels-input. Returns the current chips.
+  const labelChipController = (() => {
+    function sanitise(raw) {
+      return String(raw || '').trim().toLowerCase().slice(0, 32);
+    }
+    function getAllExistingLabels() {
+      const set = new Set();
+      for (const t of transactions) {
+        if (Array.isArray(t.labels)) t.labels.forEach(l => l && set.add(l));
+      }
+      return [...set].sort();
+    }
+    function renderChip(label) {
+      return `<span class="category-tag" data-label="${escHtml(label)}">
+        ${escHtml(label)}
+        <button type="button" class="tag-remove" data-label="${escHtml(label)}" aria-label="Remove label">×</button>
+      </span>`;
+    }
+    function getCurrentChips(root) {
+      return [...root.querySelectorAll('.chip-list .category-tag')].map(el => el.dataset.label);
+    }
+    function setChips(root, labels) {
+      const list = root.querySelector('.chip-list');
+      const clean = [...new Set(labels.map(sanitise).filter(Boolean))];
+      list.innerHTML = clean.map(renderChip).join('');
+      wireRemoveButtons(root);
+    }
+    function addChip(root, raw) {
+      const label = sanitise(raw);
+      if (!label) return;
+      const current = getCurrentChips(root);
+      if (current.includes(label)) return;
+      current.push(label);
+      setChips(root, current);
+    }
+    function wireRemoveButtons(root) {
+      root.querySelectorAll('.chip-list .tag-remove').forEach(btn => {
+        btn.onclick = (e) => {
+          e.preventDefault();
+          const current = getCurrentChips(root).filter(l => l !== btn.dataset.label);
+          setChips(root, current);
+        };
+      });
+    }
+    function renderSuggestions(root, filterText) {
+      const suggBox = root.querySelector('.chip-suggestions');
+      const current = new Set(getCurrentChips(root));
+      const all = getAllExistingLabels().filter(l => !current.has(l));
+      const filter = sanitise(filterText);
+      const matches = filter ? all.filter(l => l.includes(filter)) : all;
+      if (matches.length === 0) { suggBox.classList.add('hidden'); return; }
+      suggBox.innerHTML = matches.slice(0, 8).map(l =>
+        `<button type="button" class="chip-suggest" data-label="${escHtml(l)}">${escHtml(l)}</button>`
+      ).join('');
+      suggBox.classList.remove('hidden');
+      suggBox.querySelectorAll('.chip-suggest').forEach(btn => {
+        btn.onclick = (e) => {
+          e.preventDefault();
+          addChip(root, btn.dataset.label);
+          root.querySelector('#txn-label-text').value = '';
+          renderSuggestions(root, '');
+        };
+      });
+    }
+    function attach(root) {
+      const input = root.querySelector('#txn-label-text');
+      input.onkeydown = (e) => {
+        if (e.key === 'Enter' || e.key === ',') {
+          e.preventDefault();
+          addChip(root, input.value);
+          input.value = '';
+          renderSuggestions(root, '');
+        } else if (e.key === 'Backspace' && input.value === '') {
+          const current = getCurrentChips(root);
+          if (current.length > 0) {
+            current.pop();
+            setChips(root, current);
+          }
+        }
+      };
+      input.oninput = () => renderSuggestions(root, input.value);
+      input.onfocus = () => renderSuggestions(root, input.value);
+      input.onblur = () => {
+        setTimeout(() => root.querySelector('.chip-suggestions').classList.add('hidden'), 150);
+      };
+    }
+    return { sanitise, getAllExistingLabels, setChips, getCurrentChips, attach };
+  })();
+
   function buildCategoryOptions(type, selected = '') {
     const cats = type === 'income' ? getIncomeCategories() : getExpenseCategories();
     return `<option value="">Select category...</option>` +
@@ -1552,6 +1660,9 @@ const App = (() => {
     updateTransactionCategories('expense');
     setTodayDate();
     updateCurrencySymbols();
+    const labelRoot = document.getElementById('txn-labels-input');
+    labelChipController.setChips(labelRoot, []);
+    labelChipController.attach(labelRoot);
     document.getElementById('modal-transaction').classList.remove('hidden');
   }
 
@@ -1569,6 +1680,9 @@ const App = (() => {
     document.getElementById('txn-notes').value = t.notes || '';
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.type === t.type));
     updateCurrencySymbols();
+    const labelRoot = document.getElementById('txn-labels-input');
+    labelChipController.setChips(labelRoot, Array.isArray(t.labels) ? t.labels : []);
+    labelChipController.attach(labelRoot);
     document.getElementById('modal-transaction').classList.remove('hidden');
   }
 
@@ -1587,6 +1701,7 @@ const App = (() => {
       notes: document.getElementById('txn-notes').value.trim(),
       confirmed: isEdit ? (existing?.confirmed ?? true) : true,
     };
+    t.labels = labelChipController.getCurrentChips(document.getElementById('txn-labels-input'));
 
     try {
       await SB.upsertTransaction(t);

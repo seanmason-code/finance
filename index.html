@@ -237,6 +237,9 @@
             <option value="income">Income</option>
             <option value="transfer">Transfers</option>
           </select>
+          <select id="filter-label">
+            <option value="">All Labels</option>
+          </select>
           <input type="text" id="filter-search" placeholder="Search..." />
         </div>
         <div id="transactions-list"></div>
@@ -472,6 +475,13 @@
 
         <label>Notes (optional)</label>
         <input type="text" id="txn-notes" placeholder="Any extra details..." />
+
+        <label>Labels <span class="hint-inline">(press Enter or comma to add)</span></label>
+        <div class="chip-input" id="txn-labels-input">
+          <div class="chip-list"></div>
+          <input type="text" id="txn-label-text" placeholder="Add label..." autocomplete="off" maxlength="32" />
+          <div class="chip-suggestions hidden"></div>
+        </div>
 
         <div class="modal-actions">
           <button type="button" class="btn-ghost modal-close-btn">Cancel</button>
