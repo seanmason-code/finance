@@ -1,13 +1,13 @@
 # State: Finance Dashboard
 
-*Updated: 2026-04-19 (Phase 4 complete + deployed; Phase 5 planned, ready to execute)*
+*Updated: 2026-04-19 (Phase 5 executed; awaiting browser UAT before phase close)*
 
 ## Project Reference
 
 See: `.planning/PROJECT.md` (updated 2026-04-19)
 
 **Core value:** At-a-glance financial position for a joint household — built for Sean + Jenny specifically.
-**Current focus:** Milestone v1.1 — Phase 5 (Categorize Page). Plans written, ready to execute.
+**Current focus:** Milestone v1.1 — Phase 5 (Categorize Page). Executed; awaiting browser UAT.
 
 ## Current Position
 
@@ -15,23 +15,19 @@ See: `.planning/PROJECT.md` (updated 2026-04-19)
 |-------|-------|
 | Milestone | v1.1 PocketSmith Lift |
 | Phase | 5 — Categorize Page |
-| Wave | 0 — not started |
+| Wave | 2 — complete |
 | Plan | `.planning/phases/05-categorize-page/` |
-| Status | **READY — run `/gsd-execute-phase 5`** |
-| Last commit | Phase 5 planning docs committed |
-| Last activity | 2026-04-19 — Phase 4 smoke-tested + deployed to production; Phase 5 planned (2 plans, 2 waves) |
+| Status | **UAT PENDING — deploy then test in browser** |
+| Last commit | Phase 5 HUMAN-UAT.md committed |
+| Last activity | 2026-04-19 — Phase 5 executed (2 plans, finance-v53); 9/9 must-haves verified; 4 browser checks pending |
 
 ## To Resume
 
 ```bash
 cd ~/Projects/finance
-/gsd-execute-phase 5
-```
-
-Then deploy:
-
-```bash
 vercel --prod
+# test at https://finance-two-jet.vercel.app
+# reply "approved" to close phase → /gsd-execute-phase 6
 ```
 
 ## Phase 4 — COMPLETE ✓
@@ -65,8 +61,7 @@ All 6 waves shipped and deployed to https://finance-two-jet.vercel.app (`finance
 ## Deployed
 
 - **Live URL:** https://finance-two-jet.vercel.app
-- **Service worker version (live):** `finance-v52` (Phase 4 complete)
-- **Service worker version (next deploy):** `finance-v53` (Phase 5)
+- **Service worker version (built):** `finance-v53` (Phase 5 — not yet deployed)
 
 ## Accumulated Context
 
@@ -107,7 +102,7 @@ All 6 waves shipped and deployed to https://finance-two-jet.vercel.app (`finance
 | Phase | Name | Status |
 |-------|------|--------|
 | 4 | Transaction Foundations | ✓ Complete + deployed |
-| 5 | Categorize Page | ⏳ Ready to execute |
+| 5 | Categorize Page | 🔲 UAT pending |
 | 6 | Budget Model Refactor | Not started |
 | 7 | Forecast + Calendar | Not started |
 | 8 | Sankey + Launch | Not started |
