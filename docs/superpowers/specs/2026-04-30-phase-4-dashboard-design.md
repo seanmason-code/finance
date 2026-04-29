@@ -316,6 +316,27 @@ Roughly 7-9 plan tasks total.
 
 ---
 
+## Future phase candidate — Demo / test profile
+
+**Not Phase 4. Captured here so it doesn't get lost; slot it into the right phase later.**
+
+Sean wants to be able to demo the app to other people without exposing his and Jenny's real financial data. The fix is a dedicated **demo profile** that anyone (Sean included) can sign in to and see a fully populated, realistic-looking app:
+
+- Dedicated test login + test password (separate auth user from the real household).
+- Backed by a separate household + accounts row, so it doesn't appear in the real dashboard or affect real cycle math.
+- Pre-seeded with **about 1 year of fake transactional data** (3 years if it's cheap; 1 year is the minimum for the dashboard, journey-style features, and category aggregation to look believable).
+- Fake but realistic merchants (PAK N SAVE, Z, Spark, etc.), categories already assigned, accounts with sensible balances, an income stream consistent with the 14th-rule pay cycle.
+- Reset-on-demand: a way to wipe and re-seed the demo profile so it stays in good shape between demos.
+
+**Slot:** ideally after the dashboard and journey features have settled (so the demo profile actually shows them off), but before any wider sharing of the app. Could be its own phase, or a small companion phase to whichever launch milestone needs the demo most.
+
+**Open questions for whoever picks this up:**
+- Seed via a SQL migration, or via an idempotent seed script that hits Supabase with the service-role key?
+- Do we synthesise the txns programmatically (per-category cadences) or import from a sanitised real export?
+- Does the demo user share categories/rules with the real household, or get its own copy?
+
+---
+
 ## References
 
 - Phase 3c completion: `~/Projects/finance-v2/docs/PHASE-3C-COMPLETE.md`
