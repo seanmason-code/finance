@@ -73,6 +73,12 @@ Household
   - id, name (e.g. "Sean & Jenny")
   - owner_profile_id
   - partner_profile_ids[]
+  - salary_anchor_profile_id (FK to Profile — whose salary anchors the pay-month, default = Jenny)
+  - salary_anchor_pattern (string — merchant_clean substring used to detect the anchor salary, e.g. "LOREAL")
+  - salary_anchor_min_amount (sanity threshold to ignore mis-tagged transactions)
+  - score_weights (jsonb — overrideable health-score weights; defaults to {runway: 30, savings_rate: 25, spending_vs_baseline: 10, fixed_cost_ratio: 15, net_worth_trend: 20})
+  - felt_confidence_baseline (1–7 from CFPB onboarding question)
+  - felt_confidence_last_asked_at
 
 Account
   - id, household_id, owner_profile_id
@@ -311,11 +317,18 @@ Card kinds: anomaly (Power up $14), nudge (top up Water this week), celebration 
 
 ### 7.3 Scheduled (Monthly Recap) — Coach > Recap
 
-Vercel Cron runs on the 1st of each month at 7am NZST.
-- Pulls last month's full transaction set + snapshots + goals.
-- Calls Claude (Opus 4.7 — bigger context, better summarisation).
-- Generates a markdown recap: score change, biggest wins, biggest concerns, AI's top 3 things to do this month.
+**Anchored to Jenny's salary, not the calendar.** The "pay-month" for Sean & Jenny effectively starts the day Jenny's monthly salary lands (mortgage clears just before, salary lands just after — that's their real cycle).
+
+Mechanism:
+- Vercel Cron polls nightly at 7am NZST.
+- On each run, the job checks for an income transaction matching Jenny's salary pattern (e.g. merchant contains `LOREAL` or whatever the salary memo string turns out to be — captured during onboarding by tagging Jenny's most recent salary transaction).
+- When a new salary deposit is detected and no recap has been generated for that pay-month yet, the recap pipeline fires the *next morning*.
+- Pipeline pulls the prior pay-month's full transaction set + snapshots + goals, calls Claude (Opus 4.7), and produces a markdown recap: score change, biggest wins, biggest concerns, AI's top 3 things to do this pay-month.
 - Push notification sent. Tappable opens the recap.
+
+**Fallback:** if no salary deposit is detected by the 22nd of a calendar month (i.e. a delayed/missed salary or pattern change), run the recap anyway with a note flagging the timing anomaly. Onboarding includes a "confirm Jenny's salary deposit" step so the pattern is captured cleanly.
+
+Settings exposes the salary anchor for re-tagging if Jenny changes employer.
 
 ### 7.4 Cost control
 
@@ -340,7 +353,9 @@ Headline score, 0–100, weighted blend of 5 normalised vital signs:
 **KiwiSaver = locked.** Counted in net worth, NOT in runway.
 **Show the breakdown, not just the number.** When the score drops, the dashboard must immediately show which signal moved.
 
-**Optional onboarding question** (CFPB item 6): "Because of my money situation, I feel like I will never have the things I want in life — how true is this for you?" Stored as `felt_confidence_baseline`. Re-asked quarterly. Used by the AI Coach as a soft signal, not in the score formula.
+**Optional onboarding question** (CFPB item 6): "Because of my money situation, I feel like I will never have the things I want in life — how true is this for you?" Stored as `felt_confidence_baseline`. Re-asked quarterly. Used by the AI Coach as a soft signal, not in the score formula. **Decision:** include in v1 onboarding.
+
+**Adjustable weights — Settings panel.** The 5-signal weights (30 / 25 / 10 / 15 / 20) are stored as a household-level config and exposed in Settings → Health Score. Users can tune the weights (must sum to 100) and see the recalculated score live. Defaults are recommended; advanced. Useful for households whose vital signs don't follow the average shape (e.g. very low fixed-cost ratio because rent is owned, so they may want to rebalance toward savings rate).
 
 ---
 
@@ -393,14 +408,14 @@ Each phase is independently shippable. Order matters: foundation → core score 
 | Phase | Theme | Outputs | Shipped =? |
 |---|---|---|---|
 | **1. Bones** | New project scaffolded | Next.js + Supabase + auth working. Empty schema. Login → empty dashboard. | Sean can log in. Nothing else. |
-| **2. Salvage migration** | Data ported | Run the migration script. New app reads existing data with new schema. | All historical accounts + transactions + categories visible. |
+| **2. Salvage migration** | Data ported | Audit legacy `app.js` and the existing Supabase schema for any transaction fields, custom labels, or category metadata not yet captured in the new model — fold anything missing into the schema before migrating. Then run the migration script. New app reads existing data with new schema. | All historical accounts + transactions + categories visible. Schema review committed to a "data-model-audit" doc. |
 | **3. Akahu** | Foundation (C) | Live bank feeds. Daily sync via Cron. Auto-categorisation rules engine. | Manual CSV import is no longer required. |
 | **4. Health Score** | Core (B) | The dashboard. Score + 5 vital signs + Safe-to-Spend + Service Account row. Daily snapshot job. | Sean opens app, sees the answer to "how are we?" |
 | **5. Service Account auto-capture** | The differentiator | Cloudflare Email Routing wired. Worker → Claude vision pipeline. Bills auto-applied. Top-up detection. | Sean and Jenny stop entering bills manually. |
 | **6. AI Coach v1** | Feature (D-1) | Proactive nightly cards on the dashboard. Coach > Ask chat with full context + tools. | Useful insights appear without asking. |
 | **7. Forecast + Calendar** | Feature (A) | 90-day forecast chart, calendar view, one-click Google Calendar export of bills. | Sean and Jenny can see "what's coming." |
 | **8. Reports** | Feature | Sankey diagram, spending vs baseline by category, net-worth trend long-form. | Drill-downs available. |
-| **9. AI Coach v2** | Feature (D-2) | Monthly recap. Push notifications. Behavioural milestones. | First monthly recap lands on the 1st. |
+| **9. AI Coach v2** | Feature (D-2) | Monthly recap anchored to Jenny's salary deposit (not calendar 1st). Push notifications. Behavioural milestones. Salary-pattern capture during onboarding. | First monthly recap lands the day after Jenny's salary in. |
 | **10. Household polish** | Two-user UX | Three-view switcher. Per-person notif prefs. Manual cash wallet. KiwiSaver-as-locked visualisation. | Jenny logs in and feels at home. |
 | **11. Cutover** | Production handoff | Domain switched. Old app retired. | Sean uses only v2. |
 
@@ -430,18 +445,21 @@ Don't build:
 - Edge runtime for primary logic
 - Custom auth (Supabase covers it)
 
+**In scope but lightweight — cross-device PWA verification.** Near the end of the build (during Phase 10 polish), Sean will provide his and Jenny's phone models. The PWA must be visually verified on both iOS Safari and Android Chrome at those device dimensions — no native integration, just confirming layouts sit nicely on real devices. This is a verification step, not a separate build phase.
+
 ---
 
 ## 13. NZ-Specific Notes
 
 - **Akahu sync is once per 24h.** Frame as "synced daily," not real-time.
-- **KiwiSaver isn't on Akahu's standard tier.** Default to manual entry; offer Akahu integration as an upgrade later.
+- **KiwiSaver — manual entry is fine.** Sean & Jenny don't actively manage KiwiSaver; the balance just needs to be visible in net worth. A field in Settings to update the balance manually is sufficient. (KiwiSaver remains `is_locked = true` so it doesn't count toward runway.)
 - **Bank history depth varies** — ASB 12 months, Kiwibank credit cards 180 days, SBS ~6 months. Don't promise "all your history forever."
-- **Two-week pay cycles are common.** Runway metric handles this naturally; budget views must.
+- **Historical backfill plan.** Use the legacy app's existing ~2-year transaction history as the backfill (migrated in via Phase 2). Once Akahu starts pulling fresh data in Phase 3, the migration script must dedupe against the legacy history (match on `posted_at + amount + merchant_clean`) so there's no overlap. Anything older than what Akahu can reach stays sourced from the legacy backfill.
+- **Two-week pay cycles are common.** Runway metric handles this naturally; budget views must. Sean is on weekly salary, Jenny on monthly.
 - **Date format DD/MM/YYYY**, currency NZD with $ symbol, timezone Pacific/Auckland.
 - **GST awareness** — if Sean or Jenny has side income and approaches $60k/12mo, surface a soft warning ("approaching GST threshold").
 - **No NZ credit-score equivalent** — don't bother building it.
-- **Sharesies / Hatch** are common — link out, don't compete.
+- **Sharesies / Hatch** are common — link out, don't compete. (Sean & Jenny don't currently use these, so build only the link-out scaffolding.)
 - **Akahu is sole-source for NZ.** Keep the data layer abstract behind a `BankFeedProvider` interface.
 
 ---
@@ -460,14 +478,21 @@ The rebuild is a success when:
 
 ---
 
-## 15. Open Questions (for review)
+## 15. Decisions (resolved during spec review, 2026-04-29)
 
-- **Domain name for inbound bill aliases.** `bills.yourdomain.app`? Reuse the existing `finance-two-jet.vercel.app` or buy a proper domain (`finance.sean.nz`, etc.)?
-- **Should Jenny's onboarding require a separate Akahu connection or share Sean's?** Akahu allows both — research recommends both partners authenticate separately for a complete view.
-- **Onboarding "felt confidence" question** — include in v1, or defer? It's optional but useful for the AI Coach.
-- **Which Claude tier for monthly recap?** Spec says Opus 4.7. Sonnet 4.6 might be sufficient. Pick after testing.
-- **Migration timing.** All-at-once before Phase 3 (Akahu), or run dual-schema for safety? Spec assumes the former.
-- **Should manual cash wallet (Phase 10) move earlier?** Some couples spend a lot of cash. If you do, move it forward.
+| Question | Decision |
+|---|---|
+| Domain name for inbound bill aliases | `bills.seanmasoncode.app` (no new domain purchase needed for now). |
+| Jenny's Akahu onboarding | Single shared connection — same household, same Akahu link. Both partners get visibility through the one connection. |
+| Onboarding "felt confidence" question | Include in v1. Soft signal for the AI Coach; not in the score formula. |
+| Claude tier for monthly recap | Keep spec as-is (Opus 4.7). Sean is on the $200 plan; revisit if he steps down to a cheaper plan. |
+| Migration timing | All-at-once before Phase 3 (Akahu). Dry-run first against a fork. |
+| Manual cash wallet timing | Do NOT move earlier. Sean & Jenny don't use cash day-to-day (only ATM deposits for gifting). Phase 10 is fine. |
+| Supabase data salvage | Keep the existing ~2-year history. It's the historical backfill (see §13) and is valuable for baseline calculations. |
+| Monthly recap anchor | Day after Jenny's salary deposit lands (see §7.3 for detection mechanism). |
+| Health score weights | Adjustable in Settings → Health Score (see §8 update). |
+| KiwiSaver | Manual entry is fine — Sean & Jenny don't actively manage it. |
+| Cross-device verification | Phase 10 polish — Sean will share his and Jenny's phone models for visual review on iOS Safari + Android Chrome. |
 
 ---
 
