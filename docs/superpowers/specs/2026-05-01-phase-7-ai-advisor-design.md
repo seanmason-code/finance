@@ -234,6 +234,7 @@ This is what gets serialised into the user message. The system prompt is static 
 
 ## Out of scope (deferred)
 
+- **Service-account threshold awareness** — once Phase 6 ships service accounts with a `min_balance` (and maybe `target_balance`) field, extend `AdvisorContext` with an `accountThresholds[]` field and update the system prompt to flag breaches ("Bills account is below your $500 floor"). ~1-task addition. Phase 7 ships against today's data; service-account *transactions and balances* are visible automatically once they exist (they're just `v2.accounts` rows), but threshold-specific framing waits for Phase 6.
 - Multiple advisor buttons (cycle deep-dive, txn-explain) — Phase 7+ once we know which contextual asks matter
 - Scheduled / monthly recap mode — separate future phase, anchored to Jenny's salary deposit
 - "Advisor history" UI to browse past `ai_cards` rows — rows persist, no UI yet
@@ -273,7 +274,8 @@ Phase 5d — Demo profile (`docs/PHASE-5D-COMPLETE.md`).
 
 ## Successor (queued)
 
-- Phase 6 — Service Account auto-capture (separate stream, not blocked)
+- Phase 6 — Service Account auto-capture (separate stream, not blocked). When Phase 6 brainstorms, bake `min_balance` (and maybe `target_balance`) into the service account schema from day one so the advisor can later flag threshold breaches.
+- Phase 6 → Phase 7 integration — once service accounts have thresholds, extend `AdvisorContext.tiles` with `accountThresholds[]` and update system prompt to surface breaches ("Bills account dropped below $500 floor"). ~1-task addition.
 - Phase 8 — Charts (3-month / 6-month trends; will produce data the advisor can later cite)
 - Future — AI monthly recap (scheduled, payday-anchored)
 - Future — Phase 7 extensions: contextual advisor buttons on cycle and transaction-detail surfaces, advisor-history UI
