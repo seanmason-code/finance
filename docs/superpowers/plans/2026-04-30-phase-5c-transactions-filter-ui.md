@@ -138,10 +138,12 @@ describe("parseDatePreset", () => {
   });
 
   it("returns last cycle's anchor for 'last_cycle'", () => {
-    // Previous cycle: 14 Mar → 13 Apr
+    // Previous cycle anchor: 14 Mar 2026 is a SATURDAY, so the 14th-rule in
+    // lib/payday/cycle.ts shifts the anchor back to Friday 13 Mar. Trust the
+    // cycle helper, not the calendar date.
     expect(parseDatePreset("last_cycle", today)).toEqual({
       preset: "last_cycle",
-      since: "2026-03-14",
+      since: "2026-03-13",
     });
   });
 
