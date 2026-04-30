@@ -733,6 +733,44 @@ async function main() {
     console.log(`bank_feed_state already exists.`);
   }
 
+  // 5. Seed demo household categories. v2.categories has household_id NOT NULL
+  // (NOT global as the spec mistakenly assumed) — every household needs its own
+  // category rows. The names below MUST match the categoryName strings in
+  // scripts/_demo/merchants.ts and scripts/_demo/rules.ts exactly (case-sensitive).
+  const DEMO_CATEGORIES: Array<{ name: string; type: "income" | "expense" }> = [
+    { name: "Salary", type: "income" },
+    { name: "Groceries", type: "expense" },
+    { name: "Fuel", type: "expense" },
+    { name: "Utilities", type: "expense" },
+    { name: "Subscriptions", type: "expense" },
+    { name: "Food & Dining", type: "expense" },
+    { name: "Household", type: "expense" },
+    { name: "Personal Spending", type: "expense" },
+    { name: "Entertainment", type: "expense" },
+  ];
+
+  const { data: existingCats } = await supabase
+    .from("categories")
+    .select("name")
+    .eq("household_id", household.id);
+  const have = new Set((existingCats ?? []).map((c) => c.name));
+  const toInsert = DEMO_CATEGORIES.filter((c) => !have.has(c.name));
+  if (toInsert.length > 0) {
+    const { error: catErr } = await supabase
+      .from("categories")
+      .insert(
+        toInsert.map((c) => ({
+          household_id: household.id,
+          name: c.name,
+          type: c.type,
+        }))
+      );
+    if (catErr) throw catErr;
+    console.log(`Seeded ${toInsert.length} demo categories.`);
+  } else {
+    console.log(`All ${DEMO_CATEGORIES.length} demo categories already exist.`);
+  }
+
   console.log("");
   console.log("==========================================");
   console.log(`DEMO_HOUSEHOLD_ID=${household.id}`);
@@ -851,12 +889,21 @@ async function main() {
     process.exit(2);
   }
 
-  // 2. Get the categories we need (categories table is global)
+  // 2. Get the demo household's categories. v2.categories is per-household
+  // (NOT global as the spec mistakenly stated); setup-demo-household.mjs
+  // seeds the demo categories. Filter to the demo household_id.
   const { data: categories, error: catErr } = await supabase
     .from("categories")
-    .select("id, name");
+    .select("id, name")
+    .eq("household_id", demoHouseholdId);
   if (catErr) throw catErr;
   const categoriesByName = new Map(categories.map((c) => [c.name, c.id]));
+  if (categoriesByName.size === 0) {
+    console.error(
+      "No categories found for demo household. Did you run npm run setup:demo-household?"
+    );
+    process.exit(1);
+  }
 
   // 3. Get profiles for the demo household to attribute txns
   const { data: profiles, error: profErr } = await supabase
