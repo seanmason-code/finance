@@ -17,8 +17,8 @@
 
 The build produces code only. Sean runs these once after merge:
 
-1. Supabase Dashboard → Authentication → Users → Add user `demo@finance.local`
-2. `npm run setup:demo-household` (script written in Task 3) → prints the new household UUID
+1. Supabase Dashboard → Authentication → Users → Add user `demo@finance.local` (Sean's demo sign-in user). Sean does NOT manually create Jenny's auth user — the setup script (Task 3) creates `demo-jenny@finance.local` programmatically with a random password (no human ever signs in as her).
+2. `npm run setup:demo-household` (script written in Task 3) → creates Jenny's auth user, both profiles, household, bank_feed_state, demo categories. Prints the new household UUID.
 3. Add `DEMO_HOUSEHOLD_ID=<uuid>` to `.env.local`
 4. Add `NEXT_PUBLIC_DEMO_USER_EMAIL=demo@finance.local` to Vercel Production env
 5. `npm run seed:demo` (script written in Task 4) → 12 months of demo data
@@ -604,6 +604,14 @@ This script runs ONCE per Supabase project. Sean runs it after creating the `dem
 
 - [ ] **Step 1: Write the script**
 
+> **NOTE — heavily revised after Task 3's first dispatch escalated.** The original plan assumed a `household_members` table and a `profiles.household_id` column. Neither exists. The real schema is:
+> - `profiles.id` references `auth.users(id)` — every profile must have an auth user
+> - `profiles.email` is NOT NULL
+> - `households.owner_profile_id` (single uuid) + `households.partner_profile_ids` (uuid array) → no separate membership table
+> - `bank_feed_state.provider` is NOT NULL with CHECK ('akahu')
+>
+> Corrected approach: Sean manually creates ONE auth user (`demo@finance.local`). The script then programmatically creates a SECOND auth user (`demo-jenny@finance.local`) for Jenny via `supabase.auth.admin.createUser` (no human signs in as her — the auth user just exists for the FK constraint). Both profiles linked via households' owner + partner_profile_ids array.
+
 Create `scripts/setup-demo-household.mjs`:
 
 ```js
@@ -613,7 +621,7 @@ Create `scripts/setup-demo-household.mjs`:
 // Required env (in .env.local):
 //   NEXT_PUBLIC_SUPABASE_URL
 //   SUPABASE_SERVICE_ROLE_KEY  (RLS-bypass; local-only; never deploy to client)
-//   NEXT_PUBLIC_DEMO_USER_EMAIL  (used to find the auth user — already created in Supabase dashboard)
+//   NEXT_PUBLIC_DEMO_USER_EMAIL  (Sean's demo sign-in user — created in Supabase dashboard)
 
 import { createClient } from "@supabase/supabase-js";
 import "dotenv/config";
@@ -629,95 +637,138 @@ if (!url || !serviceKey || !demoEmail) {
   process.exit(1);
 }
 
+// Derive Jenny's email by inserting "-jenny" before the @
+function jennyEmailFrom(seanEmail) {
+  const at = seanEmail.indexOf("@");
+  if (at < 0) throw new Error(`Invalid demo email: ${seanEmail}`);
+  return `${seanEmail.slice(0, at)}-jenny${seanEmail.slice(at)}`;
+}
+const jennyEmail = jennyEmailFrom(demoEmail);
+
 const supabase = createClient(url, serviceKey, {
   auth: { autoRefreshToken: false, persistSession: false },
   db: { schema: "v2" },
 });
 
+async function findAuthUserByEmail(email) {
+  // listUsers paginates — for our scale (a handful of users) page 1 is fine.
+  const { data, error } = await supabase.auth.admin.listUsers({ perPage: 200 });
+  if (error) throw error;
+  return data.users.find((u) => u.email === email) ?? null;
+}
+
+async function ensureProfile({ id, email, display_name, role }) {
+  // profiles.id is FK to auth.users.id — must use the auth user's id.
+  const { data: existing } = await supabase
+    .from("profiles")
+    .select("id, email, display_name, role")
+    .eq("id", id)
+    .maybeSingle();
+  if (existing) {
+    console.log(`Profile already exists for ${email} (${id}).`);
+    return existing;
+  }
+  const { data, error } = await supabase
+    .from("profiles")
+    .insert({ id, email, display_name, role })
+    .select("id, email, display_name, role")
+    .single();
+  if (error) throw error;
+  console.log(`Created profile for ${email} (${id}).`);
+  return data;
+}
+
 async function main() {
   console.log(`Setting up demo household for ${demoEmail}...`);
 
-  // 1. Find the auth user (must already exist — Sean creates it in the dashboard)
-  const {
-    data: { users },
-    error: userErr,
-  } = await supabase.auth.admin.listUsers();
-  if (userErr) throw userErr;
-  const authUser = users.find((u) => u.email === demoEmail);
-  if (!authUser) {
+  // 1. Find Sean's auth user (must already exist — manual step in Supabase dashboard)
+  const seanAuth = await findAuthUserByEmail(demoEmail);
+  if (!seanAuth) {
     console.error(
       `Auth user ${demoEmail} not found. Create it in the Supabase dashboard first.`
     );
     process.exit(1);
   }
-  console.log(`Found auth user: ${authUser.id}`);
+  console.log(`Found Sean auth user: ${seanAuth.id}`);
 
-  // 2. Find or create the demo household
+  // 2. Find or create Jenny's auth user (programmatic — no human signs in as her).
+  // She exists only to satisfy profiles.id FK so we can have a second profile.
+  let jennyAuth = await findAuthUserByEmail(jennyEmail);
+  if (!jennyAuth) {
+    const { data: created, error: createErr } = await supabase.auth.admin.createUser({
+      email: jennyEmail,
+      // Random password the human never uses — service role + admin createUser
+      // doesn't require email confirmation.
+      password: crypto.randomUUID() + crypto.randomUUID(),
+      email_confirm: true,
+      user_metadata: { generated: "demo-script", demo_role: "partner" },
+    });
+    if (createErr) throw createErr;
+    jennyAuth = created.user;
+    console.log(`Created Jenny auth user: ${jennyAuth.id}`);
+  } else {
+    console.log(`Found Jenny auth user: ${jennyAuth.id}`);
+  }
+
+  // 3. Ensure both profiles exist
+  const seanProfile = await ensureProfile({
+    id: seanAuth.id,
+    email: seanAuth.email,
+    display_name: "Demo Sean",
+    role: "owner",
+  });
+  const jennyProfile = await ensureProfile({
+    id: jennyAuth.id,
+    email: jennyAuth.email,
+    display_name: "Demo Jenny",
+    role: "partner",
+  });
+
+  // 4. Find or create the demo household
   let { data: household } = await supabase
     .from("households")
-    .select("id")
+    .select("id, owner_profile_id, partner_profile_ids")
     .eq("name", "demo")
     .maybeSingle();
 
   if (!household) {
-    // Create owner profile first (so we can set owner_profile_id)
-    const { data: ownerProfile, error: pErr } = await supabase
-      .from("profiles")
-      .insert({ display_name: "Demo Sean" })
-      .select("id")
-      .single();
-    if (pErr) throw pErr;
-
     const { data: newHh, error: hhErr } = await supabase
       .from("households")
-      .insert({ name: "demo", owner_profile_id: ownerProfile.id })
-      .select("id")
+      .insert({
+        name: "demo",
+        owner_profile_id: seanProfile.id,
+        partner_profile_ids: [jennyProfile.id],
+      })
+      .select("id, owner_profile_id, partner_profile_ids")
       .single();
     if (hhErr) throw hhErr;
     household = newHh;
     console.log(`Created household: ${household.id}`);
-
-    // Backfill profile.household_id (owner)
-    await supabase
-      .from("profiles")
-      .update({ household_id: household.id })
-      .eq("id", ownerProfile.id);
-
-    // Create second profile (Demo Jenny)
-    await supabase
-      .from("profiles")
-      .insert({ display_name: "Demo Jenny", household_id: household.id });
   } else {
     console.log(`Found existing household: ${household.id}`);
+    // Idempotent self-heal: if Jenny's id isn't in partner_profile_ids, add it.
+    const partners = household.partner_profile_ids ?? [];
+    if (!partners.includes(jennyProfile.id)) {
+      const updated = [...partners, jennyProfile.id];
+      const { error: updErr } = await supabase
+        .from("households")
+        .update({ partner_profile_ids: updated })
+        .eq("id", household.id);
+      if (updErr) throw updErr;
+      console.log(`Added Jenny to partner_profile_ids.`);
+    }
   }
 
-  // 3. Link the auth user via household_members (idempotent)
-  const { data: existingMember } = await supabase
-    .from("household_members")
-    .select("user_id")
-    .eq("household_id", household.id)
-    .eq("user_id", authUser.id)
-    .maybeSingle();
-
-  if (!existingMember) {
-    const { error: memErr } = await supabase
-      .from("household_members")
-      .insert({ household_id: household.id, user_id: authUser.id });
-    if (memErr) throw memErr;
-    console.log(`Linked auth user to household.`);
-  } else {
-    console.log(`Auth user already linked.`);
-  }
-
-  // 4. Ensure bank_feed_state exists with a cutover ~12 months back
+  // 5. Ensure bank_feed_state exists with provider='akahu' and ~12-month cutover
   const cutover = new Date();
   cutover.setUTCFullYear(cutover.getUTCFullYear() - 1);
   const cutoverISO = cutover.toISOString().slice(0, 10);
 
   const { data: existingState } = await supabase
     .from("bank_feed_state")
-    .select("household_id")
+    .select("id")
     .eq("household_id", household.id)
+    .eq("provider", "akahu")
     .maybeSingle();
 
   if (!existingState) {
@@ -725,19 +776,21 @@ async function main() {
       .from("bank_feed_state")
       .insert({
         household_id: household.id,
+        provider: "akahu",
         cutover_date: cutoverISO,
       });
     if (bfsErr) throw bfsErr;
-    console.log(`Created bank_feed_state with cutover ${cutoverISO}.`);
+    console.log(`Created bank_feed_state (akahu) with cutover ${cutoverISO}.`);
   } else {
     console.log(`bank_feed_state already exists.`);
   }
 
-  // 5. Seed demo household categories. v2.categories has household_id NOT NULL
-  // (NOT global as the spec mistakenly assumed) — every household needs its own
-  // category rows. The names below MUST match the categoryName strings in
-  // scripts/_demo/merchants.ts and scripts/_demo/rules.ts exactly (case-sensitive).
-  const DEMO_CATEGORIES: Array<{ name: string; type: "income" | "expense" }> = [
+  // 6. Seed demo household categories. v2.categories has household_id NOT NULL
+  // (per-household, not global as the spec mistakenly assumed). The names
+  // below MUST match the categoryName strings in scripts/_demo/merchants.ts
+  // and scripts/_demo/rules.ts exactly (case-sensitive).
+  // Plain JS array literal — no TS annotation (this is a .mjs file).
+  const DEMO_CATEGORIES = [
     { name: "Salary", type: "income" },
     { name: "Groceries", type: "expense" },
     { name: "Fuel", type: "expense" },
@@ -905,11 +958,24 @@ async function main() {
     process.exit(1);
   }
 
-  // 3. Get profiles for the demo household to attribute txns
+  // 3. Get profiles for the demo household. profiles has no household_id
+  // column (per-household membership is tracked on households via
+  // owner_profile_id + partner_profile_ids[]). Fetch the household first
+  // and then look up the linked profile rows.
+  const { data: hhFull, error: hhFullErr } = await supabase
+    .from("households")
+    .select("owner_profile_id, partner_profile_ids")
+    .eq("id", demoHouseholdId)
+    .single();
+  if (hhFullErr) throw hhFullErr;
+  const profileIds = [
+    hhFull.owner_profile_id,
+    ...(hhFull.partner_profile_ids ?? []),
+  ];
   const { data: profiles, error: profErr } = await supabase
     .from("profiles")
     .select("id, display_name")
-    .eq("household_id", demoHouseholdId);
+    .in("id", profileIds);
   if (profErr) throw profErr;
   const seanProfile = profiles.find((p) => p.display_name === "Demo Sean");
   const jennyProfile = profiles.find((p) => p.display_name === "Demo Jenny");
