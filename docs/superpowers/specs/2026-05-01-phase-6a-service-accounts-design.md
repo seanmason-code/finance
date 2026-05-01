@@ -35,6 +35,7 @@ Ship the full manual service-account experience: data model, dedicated UI surfac
 | Top-ups + bills in transactions | Top-ups = existing `type='transfer'` transactions (paired via `parent_transaction_id`); bills = `type='expense'` transactions + new `v2.bills` row |
 | Bills table field set | Full master-spec set upfront (`amount`, `billing_period_start/end`, `due_date`, `source_email_id`, `raw_pdf_url`, `claude_extracted_json`, `applied_to_balance_at`, `transaction_id`). 6c-only fields stay nullable until 6c populates them. |
 | UI surface | Dedicated `/accounts/services` page with one mini-card per service account |
+| Mini-card visual | **Fixed-size square card per service account.** Official provider icon at top (e.g. Watercare logo for water, Mercury for power), details below (name, balance, threshold breach indicator, weeks-of-burn). All cards same dimensions for grid alignment. New `icon_url text` column on `v2.service_accounts`; user pastes the icon URL on create/edit; default placeholder icon when blank. |
 | Service account detail view | Click a mini-card → balance, threshold, weeks-of-burn, recent top-ups list, recent bills list |
 | Burn rate algorithm | Trailing 3-month average of bills. Display **nothing** until ≥3 months of history exists — no coarse estimates from 1-2 bills. |
 | Threshold breach UX | Surfaces in **three places**: mini-card red border + badge, dashboard summary teaser counter, AI advisor context |
@@ -140,6 +141,8 @@ CREATE TABLE IF NOT EXISTS v2.service_accounts (
   -- Threshold + target — Sean's "alarm" + "top-up goal"
   min_balance              numeric NOT NULL,
   target_balance           numeric,
+  -- Visual: official provider icon URL (Watercare logo, Mercury logo, etc.)
+  icon_url                 text,
   -- Future fields (nullable, populated by 6b/6c)
   provider_email_pattern   text,
   inbound_alias            text,
